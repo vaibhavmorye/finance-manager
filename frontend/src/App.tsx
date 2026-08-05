@@ -2,8 +2,10 @@ import { useEffect } from 'react'
 import { BrowserRouter, Routes, Route, Navigate, Outlet } from 'react-router-dom'
 import { useFinanceStore } from '@/store/financeStore'
 import { useTheme } from '@/hooks/useTheme'
+import { isApiMode, hasToken } from '@/lib/api'
 import { AppLayout } from '@/components/layout/AppLayout'
 import { WelcomePage } from '@/pages/WelcomePage'
+import { AuthPage } from '@/pages/AuthPage'
 import { OnboardingPage } from '@/pages/OnboardingPage'
 import { DashboardPage } from '@/pages/DashboardPage'
 import { IncomePage } from '@/pages/IncomePage'
@@ -22,20 +24,26 @@ function ThemeBoot() {
   return null
 }
 
+function Loading() {
+  return (
+    <div className="flex min-h-svh items-center justify-center">
+      <div className="h-8 w-8 animate-spin rounded-full border-2 border-brand-500 border-t-transparent" />
+    </div>
+  )
+}
+
 function RequireOnboarding() {
   const hydrated = useFinanceStore((s) => s.hydrated)
   const complete = useFinanceStore((s) => s.profile.onboardingComplete)
 
-  if (!hydrated) {
-    return (
-      <div className="flex min-h-svh items-center justify-center">
-        <div className="h-8 w-8 animate-spin rounded-full border-2 border-brand-500 border-t-transparent" />
-      </div>
-    )
+  if (!hydrated) return <Loading />
+
+  if (isApiMode() && !hasToken()) {
+    return <Navigate to="/auth" replace />
   }
 
   if (!complete) {
-    return <Navigate to="/welcome" replace />
+    return <Navigate to={isApiMode() ? '/onboarding' : '/welcome'} replace />
   }
 
   return <Outlet />
@@ -45,12 +53,11 @@ function RootRedirect() {
   const hydrated = useFinanceStore((s) => s.hydrated)
   const complete = useFinanceStore((s) => s.profile.onboardingComplete)
 
-  if (!hydrated) {
-    return (
-      <div className="flex min-h-svh items-center justify-center">
-        <div className="h-8 w-8 animate-spin rounded-full border-2 border-brand-500 border-t-transparent" />
-      </div>
-    )
+  if (!hydrated) return <Loading />
+
+  if (isApiMode()) {
+    if (!hasToken()) return <Navigate to="/auth" replace />
+    return <Navigate to={complete ? '/' : '/onboarding'} replace />
   }
 
   return <Navigate to={complete ? '/' : '/welcome'} replace />
@@ -67,10 +74,15 @@ export default function App() {
     <BrowserRouter>
       <ThemeBoot />
       <Routes>
-        <Route path="/welcome" element={<WelcomePage />} />
-        <Route path="/onboarding" element={<OnboardingPage />} />
+        <Route path="/welcome" element={isApiMode() ? <Navigate to="/auth" replace /> : <WelcomePage />} />
+        <Route path="/auth" element={isApiMode() ? <AuthPage /> : <Navigate to="/welcome" replace />} />
+        <Route
+          path="/onboarding"
+          element={
+            isApiMode() && !hasToken() ? <Navigate to="/auth" replace /> : <OnboardingPage />
+          }
+        />
 
-        {/* Calculators usable without onboarding */}
         <Route element={<AppLayout />}>
           <Route path="/calculators" element={<CalculatorsPage />} />
           <Route path="/calculators/home-loan" element={<HomeLoanCalculatorPage />} />

@@ -21,10 +21,12 @@ import {
   exportToJsonFile,
   importFromJsonFile,
 } from '@/lib/storage'
+import { isApiMode, fetchSnapshot, saveSnapshot, hasToken } from '@/lib/api'
 
 interface FinanceStore extends FinanceData {
   hydrated: boolean
   hydrate: () => void
+  hydrateFromApi: () => Promise<void>
   resetAll: () => void
   importData: (file: File) => Promise<void>
   exportData: () => void
@@ -42,9 +44,9 @@ interface FinanceStore extends FinanceData {
   completeOnboarding: () => void
 }
 
-function persist(get: () => FinanceStore) {
+function toData(get: () => FinanceStore): FinanceData {
   const state = get()
-  const data: FinanceData = {
+  return {
     version: 1,
     profile: state.profile,
     salary: state.salary,
@@ -58,7 +60,20 @@ function persist(get: () => FinanceStore) {
     expenses: state.expenses,
     settings: state.settings,
   }
+}
+
+let syncTimer: ReturnType<typeof setTimeout> | null = null
+
+function persist(get: () => FinanceStore) {
+  const data = toData(get)
   saveToLocalStorage(data)
+
+  if (isApiMode() && hasToken()) {
+    if (syncTimer) clearTimeout(syncTimer)
+    syncTimer = setTimeout(() => {
+      saveSnapshot(data).catch((err) => console.error('Failed to sync to API', err))
+    }, 600)
+  }
 }
 
 export const useFinanceStore = create<FinanceStore>((set, get) => ({
@@ -66,37 +81,47 @@ export const useFinanceStore = create<FinanceStore>((set, get) => ({
   hydrated: false,
 
   hydrate: () => {
+    if (isApiMode()) {
+      if (!hasToken()) {
+        set({ ...createDefaultData(), hydrated: true })
+        return
+      }
+      // Async hydrate — caller/App should also await hydrateFromApi
+      fetchSnapshot()
+        .then((data) => set({ ...data, hydrated: true }))
+        .catch(() => set({ ...createDefaultData(), hydrated: true }))
+      return
+    }
     const data = loadFromLocalStorage()
+    set({ ...data, hydrated: true })
+  },
+
+  hydrateFromApi: async () => {
+    const data = await fetchSnapshot()
+    saveToLocalStorage(data)
     set({ ...data, hydrated: true })
   },
 
   resetAll: () => {
     clearLocalStorage()
-    set({ ...createDefaultData(), hydrated: true })
+    const empty = createDefaultData()
+    set({ ...empty, hydrated: true })
+    if (isApiMode() && hasToken()) {
+      saveSnapshot(empty).catch(console.error)
+    }
   },
 
   importData: async (file: File) => {
     const data = await importFromJsonFile(file)
     saveToLocalStorage(data)
     set({ ...data, hydrated: true })
+    if (isApiMode() && hasToken()) {
+      await saveSnapshot(data)
+    }
   },
 
   exportData: () => {
-    const state = get()
-    exportToJsonFile({
-      version: 1,
-      profile: state.profile,
-      salary: state.salary,
-      otherIncomes: state.otherIncomes,
-      stocks: state.stocks,
-      fixedDeposits: state.fixedDeposits,
-      mutualFunds: state.mutualFunds,
-      homeLoans: state.homeLoans,
-      otherDebts: state.otherDebts,
-      healthInsurance: state.healthInsurance,
-      expenses: state.expenses,
-      settings: state.settings,
-    })
+    exportToJsonFile(toData(get))
   },
 
   setProfile: (profile) => {

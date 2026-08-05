@@ -1,8 +1,9 @@
 import { useRef, useState } from 'react'
-import { Download, Upload, Trash2, AlertTriangle } from 'lucide-react'
+import { Download, Upload, Trash2, AlertTriangle, LogOut } from 'lucide-react'
 import { Button, Card, CardHeader, CardTitle, CardDescription, Select } from '@/components/ui'
 import { useFinanceStore } from '@/store/financeStore'
 import { useTheme } from '@/hooks/useTheme'
+import { isApiMode, logout, getStoredUser } from '@/lib/api'
 import type { Currency } from '@/types/finance'
 
 export function SettingsPage() {
@@ -10,6 +11,7 @@ export function SettingsPage() {
   const { theme, setTheme } = useTheme()
   const fileRef = useRef<HTMLInputElement>(null)
   const [confirmReset, setConfirmReset] = useState(false)
+  const user = getStoredUser()
 
   const handleImport = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
@@ -29,6 +31,26 @@ export function SettingsPage() {
         <h1 className="text-2xl font-bold text-surface-900 dark:text-surface-50">Settings</h1>
         <p className="text-sm text-surface-500">Preferences and data management</p>
       </div>
+
+      {isApiMode() && user && (
+        <Card>
+          <CardHeader>
+            <div>
+              <CardTitle>Account</CardTitle>
+              <CardDescription>Signed in as {user.email}</CardDescription>
+            </div>
+          </CardHeader>
+          <Button
+            variant="outline"
+            onClick={() => {
+              logout()
+              window.location.href = '/auth'
+            }}
+          >
+            <LogOut className="h-4 w-4" /> Log out
+          </Button>
+        </Card>
+      )}
 
       <Card>
         <CardHeader>
@@ -67,7 +89,9 @@ export function SettingsPage() {
           <div>
             <CardTitle>Your data</CardTitle>
             <CardDescription>
-              Everything stays in this browser. Export a JSON backup to move devices or keep a copy.
+              {isApiMode()
+                ? 'Synced to your account. Export a JSON backup anytime.'
+                : 'Everything stays in this browser. Export a JSON backup to move devices or keep a copy.'}
             </CardDescription>
           </div>
         </CardHeader>
@@ -94,7 +118,7 @@ export function SettingsPage() {
             <CardTitle className="flex items-center gap-2 text-accent-rose">
               <AlertTriangle className="h-4 w-4" /> Danger zone
             </CardTitle>
-            <CardDescription>Reset clears all local data permanently</CardDescription>
+            <CardDescription>Reset clears all finance data</CardDescription>
           </div>
         </CardHeader>
         {!confirmReset ? (
@@ -108,7 +132,7 @@ export function SettingsPage() {
               onClick={() => {
                 store.resetAll()
                 setConfirmReset(false)
-                window.location.href = '/welcome'
+                window.location.href = isApiMode() ? '/onboarding' : '/welcome'
               }}
             >
               Yes, delete everything

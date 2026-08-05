@@ -1,0 +1,177 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "mysql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id           String   @id @default(uuid())
+  email        String   @unique
+  passwordHash String
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  profile         Profile?
+  salary          Salary?
+  otherIncomes    OtherIncome[]
+  stocks          Stock[]
+  fixedDeposits   FixedDeposit[]
+  mutualFunds     MutualFund[]
+  homeLoans       HomeLoan[]
+  otherDebts      OtherDebt[]
+  healthInsurance HealthInsurance[]
+  expenses        MonthlyExpense[]
+  settings        UserSettings?
+}
+
+model Profile {
+  id                  String  @id @default(uuid())
+  userId              String  @unique
+  name                String  @default("")
+  age                 Int     @default(30)
+  currency            String  @default("INR")
+  retirementAge       Int     @default(60)
+  onboardingComplete  Boolean @default(false)
+  user                User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model Salary {
+  id              String @id @default(uuid())
+  userId          String @unique
+  monthlyInHand   Float  @default(0)
+  user            User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model OtherIncome {
+  id        String @id @default(uuid())
+  userId    String
+  name      String
+  amount    Float
+  frequency String @default("monthly")
+  user      User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+}
+
+model Stock {
+  id           String  @id @default(uuid())
+  userId       String
+  name         String
+  ticker       String?
+  quantity     Float
+  buyPrice     Float
+  currentPrice Float
+  user         User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+}
+
+model FixedDeposit {
+  id           String   @id @default(uuid())
+  userId       String
+  name         String
+  principal    Float
+  interestRate Float
+  startDate    DateTime @db.Date
+  maturityDate DateTime @db.Date
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+}
+
+model MutualFund {
+  id             String @id @default(uuid())
+  userId         String
+  name           String
+  investedAmount Float
+  currentValue   Float
+  monthlySip     Float  @default(0)
+  user           User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+}
+
+model HomeLoan {
+  id            String       @id @default(uuid())
+  userId        String
+  name          String
+  marketValue   Float
+  purchasePrice Float
+  downPayment   Float
+  loanAmount    Float
+  startDate     DateTime     @db.Date
+  interestRate  Float
+  tenureMonths  Int
+  rateChanges   RateChange[]
+  prepayments   Prepayment[]
+  user          User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+}
+
+model RateChange {
+  id            String   @id @default(uuid())
+  homeLoanId    String
+  date          DateTime @db.Date
+  interestRate  Float
+  homeLoan      HomeLoan @relation(fields: [homeLoanId], references: [id], onDelete: Cascade)
+
+  @@index([homeLoanId])
+}
+
+model Prepayment {
+  id         String   @id @default(uuid())
+  homeLoanId String
+  date       DateTime @db.Date
+  amount     Float
+  homeLoan   HomeLoan @relation(fields: [homeLoanId], references: [id], onDelete: Cascade)
+
+  @@index([homeLoanId])
+}
+
+model OtherDebt {
+  id              String @id @default(uuid())
+  userId          String
+  name            String
+  principal       Float
+  interestRate    Float
+  emi             Float
+  remainingMonths Int
+  user            User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+}
+
+model HealthInsurance {
+  id          String   @id @default(uuid())
+  userId      String
+  provider    String
+  coverAmount Float
+  premium     Float
+  frequency   String   @default("yearly")
+  renewalDate DateTime @db.Date
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+}
+
+model MonthlyExpense {
+  id       String @id @default(uuid())
+  userId   String
+  category String
+  name     String
+  amount   Float
+  user     User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+}
+
+model UserSettings {
+  id     String @id @default(uuid())
+  userId String @unique
+  theme  String @default("system")
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
