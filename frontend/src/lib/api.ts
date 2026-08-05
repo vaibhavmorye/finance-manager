@@ -1,9 +1,26 @@
 import type { FinanceData } from '@/types/finance'
 
-const API_URL = import.meta.env.VITE_API_URL as string | undefined
+/** Storage mode: `local` (browser) or `api` (backend). Set via VITE_STORAGE_MODE. */
+export type StorageMode = 'local' | 'api'
+
+const rawMode = (import.meta.env.VITE_STORAGE_MODE as string | undefined)?.toLowerCase()
+const API_URL = (import.meta.env.VITE_API_URL as string | undefined)?.trim() || undefined
+
+/**
+ * Explicit flag wins. If unset, fall back to API mode when VITE_API_URL is present
+ * so older env files keep working.
+ */
+export function getStorageMode(): StorageMode {
+  if (rawMode === 'api' || rawMode === 'local') return rawMode
+  return API_URL ? 'api' : 'local'
+}
 
 export function isApiMode(): boolean {
-  return Boolean(API_URL)
+  return getStorageMode() === 'api'
+}
+
+export function getApiUrl(): string | undefined {
+  return API_URL
 }
 
 function authHeaders(): HeadersInit {
@@ -15,7 +32,7 @@ function authHeaders(): HeadersInit {
 }
 
 async function request<T>(path: string, options?: RequestInit): Promise<T> {
-  if (!API_URL) throw new Error('API URL not configured')
+  if (!API_URL) throw new Error('VITE_API_URL is required when VITE_STORAGE_MODE=api')
   const res = await fetch(`${API_URL}${path}`, {
     ...options,
     headers: { ...authHeaders(), ...options?.headers },

@@ -3,7 +3,9 @@ WORKDIR /app
 COPY package.json package-lock.json ./
 RUN npm ci
 COPY . .
+ARG VITE_STORAGE_MODE=local
 ARG VITE_API_URL=
+ENV VITE_STORAGE_MODE=$VITE_STORAGE_MODE
 ENV VITE_API_URL=$VITE_API_URL
 RUN npm run build
 

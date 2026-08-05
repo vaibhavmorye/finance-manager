@@ -16,6 +16,7 @@ import { useTheme } from '@/hooks/useTheme'
 import { useFinanceStore } from '@/store/financeStore'
 import { formatCurrency } from '@/lib/utils'
 import { calculateNetWorth } from '@/lib/finance/networth'
+import { isApiMode } from '@/lib/api'
 import { useMemo } from 'react'
 
 const nav = [
@@ -43,7 +44,9 @@ export function Sidebar() {
         </div>
         <div>
           <p className="text-sm font-semibold text-surface-900 dark:text-surface-50">Finance Manager</p>
-          <p className="text-xs text-surface-400">Private · Local-first</p>
+          <p className="text-xs text-surface-400">
+            {isApiMode() ? 'Synced · API' : 'Private · Local-first'}
+          </p>
         </div>
       </div>
 
