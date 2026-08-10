@@ -1,9 +1,18 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { ChevronLeft, ChevronRight, Check } from 'lucide-react'
-import { Button, Input, Select, Card } from '@/components/ui'
+import { Button, Input, Select, Card, Checkbox } from '@/components/ui'
 import { useFinanceStore } from '@/store/financeStore'
-import { createId, EXPENSE_CATEGORY_LABELS, type ExpenseCategory } from '@/types/finance'
+import {
+  createId,
+  COVERED_PERSON_LABELS,
+  COVERED_PERSON_OPTIONS,
+  EXPENSE_CATEGORY_LABELS,
+  INSURANCE_TYPE_LABELS,
+  type CoveredPerson,
+  type ExpenseCategory,
+  type InsuranceType,
+} from '@/types/finance'
 import { cn } from '@/lib/utils'
 
 const STEPS = [
@@ -150,12 +159,32 @@ function IncomeStep() {
   return (
     <div className="space-y-4">
       <Input
+        label="Monthly gross salary"
+        type="number"
+        value={salary.monthlyGross || ''}
+        onChange={(e) =>
+          setSalary({
+            monthlyGross: Number(e.target.value) || 0,
+            monthlyInHand: salary.monthlyInHand || 0,
+          })
+        }
+        placeholder="200000"
+      />
+      <Input
         label="Monthly in-hand salary"
         type="number"
         value={salary.monthlyInHand || ''}
-        onChange={(e) => setSalary({ monthlyInHand: Number(e.target.value) || 0 })}
+        onChange={(e) =>
+          setSalary({
+            monthlyGross: salary.monthlyGross || 0,
+            monthlyInHand: Number(e.target.value) || 0,
+          })
+        }
         placeholder="150000"
       />
+      <p className="text-xs text-surface-500">
+        Gross feeds the tax page; in-hand is used for cashflow.
+      </p>
       <div className="border-t border-surface-200 pt-4 dark:border-surface-700">
         <p className="mb-3 text-sm font-medium text-surface-700 dark:text-surface-300">
           Other income (optional)
@@ -194,6 +223,8 @@ function InvestmentsStep() {
   const setMutualFunds = useFinanceStore((s) => s.setMutualFunds)
   const fixedDeposits = useFinanceStore((s) => s.fixedDeposits)
   const setFixedDeposits = useFinanceStore((s) => s.setFixedDeposits)
+  const otherAssets = useFinanceStore((s) => s.otherAssets)
+  const setOtherAssets = useFinanceStore((s) => s.setOtherAssets)
 
   const [stockName, setStockName] = useState('')
   const [stockValue, setStockValue] = useState('')
@@ -201,6 +232,8 @@ function InvestmentsStep() {
   const [mfValue, setMfValue] = useState('')
   const [fdName, setFdName] = useState('')
   const [fdValue, setFdValue] = useState('')
+  const [otherName, setOtherName] = useState('')
+  const [otherValue, setOtherValue] = useState('')
 
   return (
     <div className="space-y-6">
@@ -270,6 +303,38 @@ function InvestmentsStep() {
           setFdValue('')
         }}
         items={fixedDeposits.map((f) => ({ id: f.id, label: f.name, value: f.principal }))}
+      />
+      <QuickAdd
+        title="Gold / silver / other"
+        name={otherName}
+        setName={setOtherName}
+        value={otherValue}
+        setValue={setOtherValue}
+        onAdd={() => {
+          if (!otherName || !otherValue) return
+          const v = Number(otherValue)
+          if (!Number.isFinite(v) || v <= 0) return
+          const kind = /silver/i.test(otherName) ? 'silver' : /gold/i.test(otherName) ? 'gold' : 'other'
+          setOtherAssets([
+            ...(otherAssets ?? []),
+            {
+              id: createId(),
+              name: otherName,
+              kind,
+              quantity: 1,
+              unit: 'units',
+              buyPrice: v,
+              currentPrice: v,
+            },
+          ])
+          setOtherName('')
+          setOtherValue('')
+        }}
+        items={(otherAssets ?? []).map((a) => ({
+          id: a.id,
+          label: a.name,
+          value: a.quantity * a.currentPrice,
+        }))}
       />
     </div>
   )
@@ -381,9 +446,17 @@ function DebtsStep() {
 function InsuranceStep() {
   const healthInsurance = useFinanceStore((s) => s.healthInsurance)
   const setHealthInsurance = useFinanceStore((s) => s.setHealthInsurance)
+  const [type, setType] = useState<InsuranceType>('health')
   const [provider, setProvider] = useState('')
   const [cover, setCover] = useState('')
   const [premium, setPremium] = useState('')
+  const [peopleCovered, setPeopleCovered] = useState<CoveredPerson[]>([])
+
+  const togglePerson = (person: CoveredPerson, checked: boolean) => {
+    setPeopleCovered((prev) =>
+      checked ? [...prev, person] : prev.filter((p) => p !== person),
+    )
+  }
 
   const add = () => {
     if (!provider || !premium) return
@@ -392,30 +465,67 @@ function InsuranceStep() {
       {
         id: createId(),
         provider,
+        type,
         coverAmount: Number(cover) || 0,
         premium: Number(premium),
         frequency: 'yearly',
         renewalDate: new Date().toISOString().slice(0, 10),
+        peopleCovered,
       },
     ])
     setProvider('')
     setCover('')
     setPremium('')
+    setPeopleCovered([])
+    setType('health')
   }
 
   return (
     <div className="space-y-4">
+      <Select
+        label="Type"
+        value={type}
+        onChange={(e) => setType(e.target.value as InsuranceType)}
+        options={[
+          { value: 'health', label: 'Health insurance' },
+          { value: 'term', label: 'Term insurance' },
+        ]}
+      />
       <Input label="Provider" value={provider} onChange={(e) => setProvider(e.target.value)} placeholder="HDFC Ergo…" />
       <div className="grid gap-4 sm:grid-cols-2">
-        <Input label="Cover amount" type="number" value={cover} onChange={(e) => setCover(e.target.value)} />
+        <Input
+          label={type === 'term' ? 'Sum assured' : 'Cover amount'}
+          type="number"
+          value={cover}
+          onChange={(e) => setCover(e.target.value)}
+        />
         <Input label="Annual premium" type="number" value={premium} onChange={(e) => setPremium(e.target.value)} />
+      </div>
+      <div>
+        <p className="mb-2 text-sm font-medium text-surface-700 dark:text-surface-200">
+          People covered
+        </p>
+        <div className="grid gap-2 sm:grid-cols-2">
+          {COVERED_PERSON_OPTIONS.map((person) => (
+            <Checkbox
+              key={person}
+              label={COVERED_PERSON_LABELS[person]}
+              checked={peopleCovered.includes(person)}
+              onChange={(checked) => togglePerson(person, checked)}
+            />
+          ))}
+        </div>
       </div>
       <Button type="button" variant="secondary" onClick={add}>
         Add policy
       </Button>
       {healthInsurance.map((p) => (
         <p key={p.id} className="text-sm text-surface-600">
-          {p.provider} — cover {p.coverAmount.toLocaleString()}
+          {INSURANCE_TYPE_LABELS[p.type ?? 'health']} · {p.provider} — cover{' '}
+          {p.coverAmount.toLocaleString()}
+          {(p.peopleCovered?.length ?? 0) > 0
+            ? ` · ${p.peopleCovered.map((person) => COVERED_PERSON_LABELS[person]).join(', ')}`
+            : ''}
         </p>
       ))}
     </div>

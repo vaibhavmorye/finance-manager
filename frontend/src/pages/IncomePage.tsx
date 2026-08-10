@@ -12,6 +12,11 @@ export function IncomePage() {
   const [open, setOpen] = useState(false)
   const [form, setForm] = useState({ name: '', amount: '', frequency: 'monthly' as IncomeFrequency })
 
+  const gross = store.salary.monthlyGross ?? 0
+  const inHand = store.salary.monthlyInHand ?? 0
+  const impliedAnnualTax =
+    gross > 0 && inHand > 0 && gross >= inHand ? (gross - inHand) * 12 : null
+
   const add = () => {
     if (!form.name || !form.amount) return
     store.setOtherIncomes([
@@ -32,7 +37,7 @@ export function IncomePage() {
         <div>
           <h1 className="text-2xl font-bold text-surface-900 dark:text-surface-50">Income</h1>
           <p className="text-sm text-surface-500">
-            Total monthly ~ {formatCurrency(monthlyIncome(store), currency)}
+            Cashflow monthly ~ {formatCurrency(monthlyIncome(store), currency)}
           </p>
         </div>
         <Button onClick={() => setOpen(true)}>
@@ -40,16 +45,46 @@ export function IncomePage() {
         </Button>
       </div>
 
-      <Card>
+      <Card className="space-y-4">
         <CardHeader>
-          <CardTitle>Salary (monthly in-hand)</CardTitle>
+          <CardTitle>Salary</CardTitle>
         </CardHeader>
-        <Input
-          type="number"
-          value={store.salary.monthlyInHand || ''}
-          onChange={(e) => store.setSalary({ monthlyInHand: Number(e.target.value) || 0 })}
-          placeholder="150000"
-        />
+        <div className="grid gap-4 sm:grid-cols-2">
+          <Input
+            label="Monthly gross"
+            type="number"
+            value={gross || ''}
+            onChange={(e) =>
+              store.setSalary({
+                monthlyGross: Number(e.target.value) || 0,
+                monthlyInHand: inHand,
+              })
+            }
+            placeholder="200000"
+          />
+          <Input
+            label="Monthly in-hand"
+            type="number"
+            value={inHand || ''}
+            onChange={(e) =>
+              store.setSalary({
+                monthlyGross: gross,
+                monthlyInHand: Number(e.target.value) || 0,
+              })
+            }
+            placeholder="150000"
+          />
+        </div>
+        <p className="text-xs text-surface-500">
+          Tax uses gross; cashflow and budgeting use in-hand.
+          {impliedAnnualTax != null && (
+            <>
+              {' '}
+              Implied annual tax wedge ~ {formatCurrency(impliedAnnualTax, currency)} (rough TDS
+              check, not exact).
+            </>
+          )}
+        </p>
       </Card>
 
       <div className="space-y-3">
