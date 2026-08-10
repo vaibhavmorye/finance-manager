@@ -1,23 +1,58 @@
-import { useRef } from 'react'
+import { useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Upload, UserPlus, Shield, Lock, Sparkles } from 'lucide-react'
 import { Button } from '@/components/ui'
+import { BackupPasswordModal } from '@/components/BackupPasswordModal'
 import { useFinanceStore } from '@/store/financeStore'
+import { peekBackupFile } from '@/lib/storage'
 
 export function WelcomePage() {
   const navigate = useNavigate()
   const importData = useFinanceStore((s) => s.importData)
   const loadDemoData = useFinanceStore((s) => s.loadDemoData)
   const fileRef = useRef<HTMLInputElement>(null)
+  const [importOpen, setImportOpen] = useState(false)
+  const [pendingImport, setPendingImport] = useState<File | null>(null)
+  const [busy, setBusy] = useState(false)
+  const [passwordError, setPasswordError] = useState<string | null>(null)
 
-  const handleImport = async (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleImportPick = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
+    e.target.value = ''
     if (!file) return
+
+    const kind = await peekBackupFile(file)
+    if (kind === 'invalid') {
+      alert('Invalid finance data file. Please use a valid export.')
+      return
+    }
+    if (kind === 'encrypted') {
+      setPasswordError(null)
+      setPendingImport(file)
+      setImportOpen(true)
+      return
+    }
     try {
       await importData(file)
       navigate('/')
     } catch (err) {
       alert(err instanceof Error ? err.message : 'Failed to import file')
+    }
+  }
+
+  const handleEncryptedImport = async (password: string) => {
+    if (!pendingImport) return
+    setBusy(true)
+    setPasswordError(null)
+    try {
+      await importData(pendingImport, password)
+      setImportOpen(false)
+      setPendingImport(null)
+      navigate('/')
+    } catch (err) {
+      setPasswordError(err instanceof Error ? err.message : 'Failed to import file')
+    } finally {
+      setBusy(false)
     }
   }
 
@@ -91,10 +126,12 @@ export function WelcomePage() {
               <span className="block font-semibold text-surface-900 dark:text-surface-50">
                 Import my data
               </span>
-              <span className="text-sm text-surface-500">Load a previously exported JSON backup</span>
+              <span className="text-sm text-surface-500">
+                Load an encrypted (or legacy) JSON backup
+              </span>
             </span>
           </button>
-          <input ref={fileRef} type="file" accept="application/json,.json" className="hidden" onChange={handleImport} />
+          <input ref={fileRef} type="file" accept="application/json,.json" className="hidden" onChange={handleImportPick} />
         </div>
 
         <div className="mt-8 flex items-center justify-center gap-6 text-xs text-surface-400">
@@ -112,6 +149,19 @@ export function WelcomePage() {
           </Button>
         </div>
       </div>
+
+      <BackupPasswordModal
+        open={importOpen}
+        mode="import"
+        busy={busy}
+        error={passwordError}
+        onClose={() => {
+          if (busy) return
+          setImportOpen(false)
+          setPendingImport(null)
+        }}
+        onSubmit={handleEncryptedImport}
+      />
     </div>
   )
 }

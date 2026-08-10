@@ -1,9 +1,11 @@
 import { useRef, useState } from 'react'
 import { Download, Upload, Trash2, AlertTriangle, LogOut } from 'lucide-react'
 import { Button, Card, CardHeader, CardTitle, CardDescription, Select } from '@/components/ui'
+import { BackupPasswordModal } from '@/components/BackupPasswordModal'
 import { useFinanceStore } from '@/store/financeStore'
 import { useTheme } from '@/hooks/useTheme'
 import { isApiMode, logout, getStoredUser } from '@/lib/api'
+import { peekBackupFile } from '@/lib/storage'
 import type { Currency } from '@/types/finance'
 
 export function SettingsPage() {
@@ -11,18 +13,64 @@ export function SettingsPage() {
   const { theme, setTheme } = useTheme()
   const fileRef = useRef<HTMLInputElement>(null)
   const [confirmReset, setConfirmReset] = useState(false)
+  const [exportOpen, setExportOpen] = useState(false)
+  const [importOpen, setImportOpen] = useState(false)
+  const [pendingImport, setPendingImport] = useState<File | null>(null)
+  const [busy, setBusy] = useState(false)
+  const [passwordError, setPasswordError] = useState<string | null>(null)
   const user = getStoredUser()
 
-  const handleImport = async (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleImportPick = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
+    e.target.value = ''
     if (!file) return
+
+    const kind = await peekBackupFile(file)
+    if (kind === 'invalid') {
+      alert('Invalid finance data file. Please use a valid export.')
+      return
+    }
+    if (kind === 'encrypted') {
+      setPasswordError(null)
+      setPendingImport(file)
+      setImportOpen(true)
+      return
+    }
     try {
       await store.importData(file)
       alert('Data imported successfully')
     } catch (err) {
       alert(err instanceof Error ? err.message : 'Import failed')
     }
-    e.target.value = ''
+  }
+
+  const handleExport = async (password: string) => {
+    setBusy(true)
+    setPasswordError(null)
+    try {
+      await store.exportData(password)
+      setExportOpen(false)
+    } catch (err) {
+      setPasswordError(err instanceof Error ? err.message : 'Export failed')
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  const handleEncryptedImport = async (password: string) => {
+    if (!pendingImport) return
+    setBusy(true)
+    setPasswordError(null)
+    try {
+      await store.importData(pendingImport, password)
+      setImportOpen(false)
+      setPendingImport(null)
+      alert('Data imported successfully')
+    } catch (err) {
+      setPasswordError(err instanceof Error ? err.message : 'Import failed')
+    } finally {
+      setBusy(false)
+    }
   }
 
   return (
@@ -90,24 +138,24 @@ export function SettingsPage() {
             <CardTitle>Your data</CardTitle>
             <CardDescription>
               {isApiMode()
-                ? 'Synced to your account. Export a JSON backup anytime.'
-                : 'Everything stays in this browser. Export a JSON backup to move devices or keep a copy.'}
+                ? 'Synced to your account. Export an encrypted JSON backup anytime.'
+                : 'Everything stays in this browser. Export an encrypted JSON backup to move devices or keep a copy.'}
             </CardDescription>
           </div>
         </CardHeader>
         <div className="flex flex-wrap gap-3">
-          <Button onClick={() => store.exportData()}>
-            <Download className="h-4 w-4" /> Export JSON
+          <Button onClick={() => { setPasswordError(null); setExportOpen(true) }}>
+            <Download className="h-4 w-4" /> Export encrypted
           </Button>
           <Button variant="outline" onClick={() => fileRef.current?.click()}>
-            <Upload className="h-4 w-4" /> Import JSON
+            <Upload className="h-4 w-4" /> Import backup
           </Button>
           <input
             ref={fileRef}
             type="file"
             accept="application/json,.json"
             className="hidden"
-            onChange={handleImport}
+            onChange={handleImportPick}
           />
         </div>
       </Card>
@@ -143,6 +191,27 @@ export function SettingsPage() {
           </div>
         )}
       </Card>
+
+      <BackupPasswordModal
+        open={exportOpen}
+        mode="export"
+        busy={busy}
+        error={passwordError}
+        onClose={() => { if (!busy) setExportOpen(false) }}
+        onSubmit={handleExport}
+      />
+      <BackupPasswordModal
+        open={importOpen}
+        mode="import"
+        busy={busy}
+        error={passwordError}
+        onClose={() => {
+          if (busy) return
+          setImportOpen(false)
+          setPendingImport(null)
+        }}
+        onSubmit={handleEncryptedImport}
+      />
     </div>
   )
 }

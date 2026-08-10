@@ -38,10 +38,11 @@ interface FinanceStore extends FinanceData {
   hydrate: () => void
   hydrateFromApi: () => Promise<void>
   resetAll: () => void
-  importData: (file: File) => Promise<void>
+  importData: (file: File, password?: string) => Promise<void>
   /** Load sample Indian household data and mark onboarding complete. */
   loadDemoData: () => void
-  exportData: () => void
+  /** Export encrypted JSON backup. Password is required. */
+  exportData: (password: string) => Promise<void>
   setProfile: (profile: Partial<Profile>) => void
   setSalary: (salary: Salary) => void
   setOtherIncomes: (items: OtherIncome[]) => void
@@ -195,8 +196,8 @@ export const useFinanceStore = create<FinanceStore>((set, get) => ({
     }
   },
 
-  importData: async (file: File) => {
-    const data = await importFromJsonFile(file)
+  importData: async (file: File, password?: string) => {
+    const data = await importFromJsonFile(file, password)
     saveToLocalStorage(data)
     set({ ...normalizeLoaded(data), hydrated: true })
     if (isApiMode() && hasToken()) {
@@ -213,8 +214,8 @@ export const useFinanceStore = create<FinanceStore>((set, get) => ({
     }
   },
 
-  exportData: () => {
-    exportToJsonFile(toData(get))
+  exportData: async (password: string) => {
+    await exportToJsonFile(toData(get), password)
   },
 
   setProfile: (profile) => {
