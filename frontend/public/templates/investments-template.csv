@@ -1,0 +1,7 @@
+type,name,ticker,quantity,buyPrice,currentPrice,investedAmount,currentValue,monthlySip,principal,interestRate,startDate,maturityDate,unit
+stock,Reliance Industries,RELIANCE,10,2500,2800,,,,,,,
+stock,Tata Motors,TATAMOTORS,20,600,650,,,,,,,
+mf,Parag Parikh Flexi Cap,,,,50000,62000,5000,,,,
+fd,HDFC Bank FD,,,,,,,,200000,7.1,2024-01-15,2025-01-15,
+gold,Physical gold,,,50,6500,7200,,,,,,,g
+silver,Physical silver,,,500,80,95,,,,,,,g
