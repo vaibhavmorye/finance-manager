@@ -10,6 +10,7 @@ import {
   Settings,
   Moon,
   Sun,
+  FileText,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { useTheme } from '@/hooks/useTheme'
@@ -24,7 +25,8 @@ const nav = [
   { to: '/income', label: 'Income', icon: Wallet },
   { to: '/investments', label: 'Investments', icon: TrendingUp },
   { to: '/debts', label: 'Debts', icon: Landmark },
-  { to: '/expenses', label: 'Expenses', icon: Receipt },
+  { to: '/cashflow', label: 'Cash flow', icon: Receipt },
+  { to: '/tax', label: 'Tax', icon: FileText },
   { to: '/insurance', label: 'Insurance', icon: Shield },
   { to: '/calculators', label: 'Calculators', icon: Calculator },
   { to: '/settings', label: 'Settings', icon: Settings },

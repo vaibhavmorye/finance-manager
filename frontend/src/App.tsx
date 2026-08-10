@@ -11,8 +11,9 @@ import { DashboardPage } from '@/pages/DashboardPage'
 import { IncomePage } from '@/pages/IncomePage'
 import { InvestmentsPage } from '@/pages/InvestmentsPage'
 import { DebtsPage } from '@/pages/DebtsPage'
-import { ExpensesPage } from '@/pages/ExpensesPage'
+import { CashFlowPage } from '@/pages/CashFlowPage'
 import { InsurancePage } from '@/pages/InsurancePage'
+import { TaxPage } from '@/pages/TaxPage'
 import { CalculatorsPage } from '@/pages/CalculatorsPage'
 import { HomeLoanCalculatorPage } from '@/pages/calculators/HomeLoanCalculatorPage'
 import { FireCalculatorPage } from '@/pages/calculators/FireCalculatorPage'
@@ -96,7 +97,9 @@ export default function App() {
             <Route path="/income" element={<IncomePage />} />
             <Route path="/investments" element={<InvestmentsPage />} />
             <Route path="/debts" element={<DebtsPage />} />
-            <Route path="/expenses" element={<ExpensesPage />} />
+            <Route path="/cashflow" element={<CashFlowPage />} />
+            <Route path="/expenses" element={<Navigate to="/cashflow" replace />} />
+            <Route path="/tax" element={<TaxPage />} />
             <Route path="/insurance" element={<InsurancePage />} />
             <Route path="/settings" element={<SettingsPage />} />
           </Route>

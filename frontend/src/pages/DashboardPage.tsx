@@ -23,7 +23,7 @@ import {
 } from '@/lib/finance/networth'
 import { calculateFire } from '@/lib/finance/fire'
 
-const COLORS = ['#10b981', '#0ea5e9', '#8b5cf6', '#f59e0b']
+const COLORS = ['#10b981', '#0ea5e9', '#8b5cf6', '#f59e0b', '#d97706']
 
 export function DashboardPage() {
   const store = useFinanceStore()
@@ -51,6 +51,7 @@ export function DashboardPage() {
     { name: 'Stocks', value: nw.stocks },
     { name: 'Mutual funds', value: nw.mutualFunds },
     { name: 'FDs', value: nw.fixedDeposits },
+    { name: 'Gold & other', value: nw.otherAssets },
     { name: 'Property equity', value: Math.max(0, nw.propertyEquity) },
   ].filter((d) => d.value > 0)
 
@@ -92,7 +93,7 @@ export function DashboardPage() {
         <StatCard
           label="Invested corpus"
           value={formatCurrency(corpus, currency, { compact: true })}
-          sub="Stocks + MF + FD"
+          sub="Stocks + MF + FD + other"
           icon={<TrendingUp className="h-4 w-4" />}
         />
         <StatCard
@@ -146,6 +147,12 @@ export function DashboardPage() {
               <CardTitle>Monthly cash flow</CardTitle>
               <CardDescription>Income vs outflows</CardDescription>
             </div>
+            <Link
+              to="/cashflow"
+              className="flex items-center gap-1 text-sm font-medium text-brand-600 hover:text-brand-700"
+            >
+              Open cash flow <ArrowRight className="h-3.5 w-3.5" />
+            </Link>
           </CardHeader>
           <div className="h-56">
             <ResponsiveContainer width="100%" height="100%">
