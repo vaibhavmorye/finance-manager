@@ -5,7 +5,7 @@ import {
   requiredPrincipalForTarget,
   addMonthsIso,
 } from './interest'
-import { calculateSwp, requiredCorpusForSwp } from './swp'
+import { calculateSwp, requiredCorpusForSwp, startingWithdrawalAmount } from './swp'
 
 describe('lumpSumMaturity', () => {
   it('applies simple interest', () => {
@@ -184,5 +184,74 @@ describe('calculateSwp', () => {
     })
     expect(flat.sustainable).toBe(true)
     expect(stepped.sustainable).toBe(false)
+  })
+
+  it('deferred start needs less corpus today than at SWP start', () => {
+    const result = calculateSwp({
+      mode: 'required_corpus',
+      monthlyWithdrawal: 40_000,
+      annualReturnPercent: 8,
+      years: 20,
+      yearsUntilStart: 10,
+      withdrawalBasis: 'at_start',
+    })
+    expect(result.requiredCorpusAtStart).toBeGreaterThan(result.requiredCorpus)
+    expect(result.startingMonthlyWithdrawal).toBe(40_000)
+    expect(result.sustainable).toBe(true)
+    expect(result.projection.some((p) => p.accumulating)).toBe(true)
+  })
+
+  it('inflates first withdrawal when basis is today', () => {
+    expect(startingWithdrawalAmount(40_000, 10, 5, 'today')).toBeCloseTo(
+      40_000 * Math.pow(1.05, 10),
+      5,
+    )
+    expect(startingWithdrawalAmount(40_000, 10, 5, 'at_start')).toBe(40_000)
+
+    const todayBasis = calculateSwp({
+      mode: 'required_corpus',
+      monthlyWithdrawal: 40_000,
+      annualReturnPercent: 8,
+      years: 15,
+      yearsUntilStart: 10,
+      annualStepUpPercent: 5,
+      withdrawalBasis: 'today',
+    })
+    const atStartBasis = calculateSwp({
+      mode: 'required_corpus',
+      monthlyWithdrawal: 40_000,
+      annualReturnPercent: 8,
+      years: 15,
+      yearsUntilStart: 10,
+      annualStepUpPercent: 5,
+      withdrawalBasis: 'at_start',
+    })
+    expect(todayBasis.startingMonthlyWithdrawal).toBeGreaterThan(
+      atStartBasis.startingMonthlyWithdrawal,
+    )
+    expect(todayBasis.requiredCorpus).toBeGreaterThan(atStartBasis.requiredCorpus)
+  })
+
+  it('grows existing corpus before withdrawals begin', () => {
+    const immediate = calculateSwp({
+      mode: 'sustainability',
+      corpus: 50_00_000,
+      monthlyWithdrawal: 40_000,
+      annualReturnPercent: 8,
+      years: 20,
+      yearsUntilStart: 0,
+    })
+    const deferred = calculateSwp({
+      mode: 'sustainability',
+      corpus: 50_00_000,
+      monthlyWithdrawal: 40_000,
+      annualReturnPercent: 8,
+      years: 20,
+      yearsUntilStart: 10,
+      withdrawalBasis: 'at_start',
+    })
+    // Same draw for longer total horizon, but growth first — should last longer / end higher
+    expect(deferred.endingCorpus).toBeGreaterThan(immediate.endingCorpus)
+    expect(deferred.sustainable).toBe(true)
   })
 })

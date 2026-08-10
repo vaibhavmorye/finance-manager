@@ -16,11 +16,20 @@ import { CreatePotModal, type CreatePotDraft } from '@/components/CreatePotModal
 import { useFinanceStore } from '@/store/financeStore'
 import { formatCurrency } from '@/lib/utils'
 import { mfValue } from '@/lib/finance/networth'
-import { calculateSwp, type SwpCalcMode } from '@/lib/finance/swp'
+import {
+  calculateSwp,
+  type SwpCalcMode,
+  type SwpWithdrawalBasis,
+} from '@/lib/finance/swp'
 
 const modeOptions: { value: SwpCalcMode; label: string }[] = [
   { value: 'sustainability', label: 'Will my corpus last?' },
   { value: 'required_corpus', label: 'Corpus needed for income' },
+]
+
+const basisOptions: { value: SwpWithdrawalBasis; label: string }[] = [
+  { value: 'today', label: "Today's rupees (inflate until start)" },
+  { value: 'at_start', label: 'Amount at SWP start (as entered)' },
 ]
 
 export function SwpCalculatorPage() {
@@ -32,9 +41,13 @@ export function SwpCalculatorPage() {
   const [corpus, setCorpus] = useState(String(mfCorpus > 0 ? Math.round(mfCorpus) : 50_00_000))
   const [withdrawal, setWithdrawal] = useState('40000')
   const [returnPct, setReturnPct] = useState('8')
+  const [yearsUntilStart, setYearsUntilStart] = useState('0')
   const [years, setYears] = useState('25')
   const [stepUp, setStepUp] = useState('0')
+  const [withdrawalBasis, setWithdrawalBasis] = useState<SwpWithdrawalBasis>('today')
   const [createOpen, setCreateOpen] = useState(false)
+
+  const deferYears = Number(yearsUntilStart) || 0
 
   const result = useMemo(
     () =>
@@ -45,8 +58,10 @@ export function SwpCalculatorPage() {
         annualReturnPercent: Number(returnPct) || 0,
         years: Number(years) || 0,
         annualStepUpPercent: Number(stepUp) || 0,
+        yearsUntilStart: deferYears,
+        withdrawalBasis,
       }),
-    [mode, corpus, withdrawal, returnPct, years, stepUp],
+    [mode, corpus, withdrawal, returnPct, years, stepUp, deferYears, withdrawalBasis],
   )
 
   const planCorpus =
@@ -105,7 +120,7 @@ export function SwpCalculatorPage() {
           {mode === 'sustainability' && (
             <>
               <Input
-                label="Starting corpus"
+                label="Starting corpus (today)"
                 type="number"
                 value={corpus}
                 onChange={(e) => setCorpus(e.target.value)}
@@ -128,13 +143,28 @@ export function SwpCalculatorPage() {
             onChange={(e) => setWithdrawal(e.target.value)}
           />
           <Input
+            label="Withdrawals start after (years)"
+            type="number"
+            value={yearsUntilStart}
+            onChange={(e) => setYearsUntilStart(e.target.value)}
+            hint="0 = start immediately; corpus grows until then"
+          />
+          {deferYears > 0 && (
+            <Select
+              label="Withdrawal amount basis"
+              value={withdrawalBasis}
+              onChange={(e) => setWithdrawalBasis(e.target.value as SwpWithdrawalBasis)}
+              options={basisOptions}
+            />
+          )}
+          <Input
             label="Expected return %"
             type="number"
             value={returnPct}
             onChange={(e) => setReturnPct(e.target.value)}
           />
           <Input
-            label="Duration (years)"
+            label="SWP duration (years)"
             type="number"
             value={years}
             onChange={(e) => setYears(e.target.value)}
@@ -144,7 +174,11 @@ export function SwpCalculatorPage() {
             type="number"
             value={stepUp}
             onChange={(e) => setStepUp(e.target.value)}
-            hint="Increase withdrawal each year"
+            hint={
+              deferYears > 0 && withdrawalBasis === 'today'
+                ? 'Inflates withdrawal until start, then each SWP year'
+                : 'Increase withdrawal each year during SWP'
+            }
           />
         </Card>
 
@@ -155,12 +189,25 @@ export function SwpCalculatorPage() {
                 ? 'Lasts full term'
                 : `Depletes in ~${result.monthsUntilDeplete} months`}
             </Badge>
+            {deferYears > 0 && (
+              <Badge variant="info">
+                SWP starts in {deferYears} yr
+                {result.startingMonthlyWithdrawal !== Number(withdrawal) &&
+                  ` · first draw ${formatCurrency(result.startingMonthlyWithdrawal, currency, { compact: true })}/mo`}
+              </Badge>
+            )}
           </div>
-          <div className="grid gap-3 sm:grid-cols-3">
+          <div className={`grid gap-3 ${deferYears > 0 ? 'sm:grid-cols-2 lg:grid-cols-4' : 'sm:grid-cols-3'}`}>
             <StatCard
-              label="Required corpus"
+              label={deferYears > 0 ? 'Required corpus today' : 'Required corpus'}
               value={formatCurrency(result.requiredCorpus, currency, { compact: true })}
             />
+            {deferYears > 0 && (
+              <StatCard
+                label="Required at SWP start"
+                value={formatCurrency(result.requiredCorpusAtStart, currency, { compact: true })}
+              />
+            )}
             <StatCard
               label="Ending corpus"
               value={formatCurrency(result.endingCorpus, currency, { compact: true })}
