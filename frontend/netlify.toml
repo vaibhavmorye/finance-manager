@@ -1,0 +1,9 @@
+[build]
+  command = "npm run build:desktop"
+  publish = "dist"
+
+# SPA: serve index.html for all paths so /calculators and nested routes work.
+[[redirects]]
+  from = "/*"
+  to = "/index.html"
+  status = 200

@@ -1,12 +1,26 @@
 import { useRef, useState } from 'react'
 import { Download, Upload, Trash2, AlertTriangle, LogOut } from 'lucide-react'
-import { Button, Card, CardHeader, CardTitle, CardDescription, Select } from '@/components/ui'
+import { Button, Card, CardHeader, CardTitle, CardDescription, Select, Checkbox } from '@/components/ui'
 import { BackupPasswordModal } from '@/components/BackupPasswordModal'
+import { BackupLeaveModal } from '@/components/BackupLeaveModal'
 import { useFinanceStore } from '@/store/financeStore'
 import { useTheme } from '@/hooks/useTheme'
-import { isApiMode, logout, getStoredUser } from '@/lib/api'
+import { isApiMode, getStoredUser } from '@/lib/api'
 import { peekBackupFile } from '@/lib/storage'
+import { needsBackupPrompt, performSessionExit } from '@/lib/backupGuard'
 import type { Currency } from '@/types/finance'
+
+function formatBackupTime(iso: string | null): string {
+  if (!iso) return 'Never'
+  try {
+    return new Date(iso).toLocaleString(undefined, {
+      dateStyle: 'medium',
+      timeStyle: 'short',
+    })
+  } catch {
+    return iso
+  }
+}
 
 export function SettingsPage() {
   const store = useFinanceStore()
@@ -15,9 +29,11 @@ export function SettingsPage() {
   const [confirmReset, setConfirmReset] = useState(false)
   const [exportOpen, setExportOpen] = useState(false)
   const [importOpen, setImportOpen] = useState(false)
+  const [leaveOpen, setLeaveOpen] = useState(false)
   const [pendingImport, setPendingImport] = useState<File | null>(null)
   const [busy, setBusy] = useState(false)
   const [passwordError, setPasswordError] = useState<string | null>(null)
+  const [exitAfterExport, setExitAfterExport] = useState(false)
   const user = getStoredUser()
 
   const handleImportPick = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -50,6 +66,10 @@ export function SettingsPage() {
     try {
       await store.exportData(password)
       setExportOpen(false)
+      if (exitAfterExport) {
+        setExitAfterExport(false)
+        performSessionExit()
+      }
     } catch (err) {
       setPasswordError(err instanceof Error ? err.message : 'Export failed')
     } finally {
@@ -73,6 +93,14 @@ export function SettingsPage() {
     }
   }
 
+  const requestLogout = () => {
+    if (needsBackupPrompt()) {
+      setLeaveOpen(true)
+      return
+    }
+    performSessionExit()
+  }
+
   return (
     <div className="mx-auto max-w-2xl space-y-6">
       <div>
@@ -88,13 +116,7 @@ export function SettingsPage() {
               <CardDescription>Signed in as {user.email}</CardDescription>
             </div>
           </CardHeader>
-          <Button
-            variant="outline"
-            onClick={() => {
-              logout()
-              window.location.href = '/auth'
-            }}
-          >
+          <Button variant="outline" onClick={requestLogout}>
             <LogOut className="h-4 w-4" /> Log out
           </Button>
         </Card>
@@ -143,20 +165,32 @@ export function SettingsPage() {
             </CardDescription>
           </div>
         </CardHeader>
-        <div className="flex flex-wrap gap-3">
-          <Button onClick={() => { setPasswordError(null); setExportOpen(true) }}>
-            <Download className="h-4 w-4" /> Export encrypted
-          </Button>
-          <Button variant="outline" onClick={() => fileRef.current?.click()}>
-            <Upload className="h-4 w-4" /> Import backup
-          </Button>
-          <input
-            ref={fileRef}
-            type="file"
-            accept="application/json,.json"
-            className="hidden"
-            onChange={handleImportPick}
+        <div className="space-y-4">
+          <Checkbox
+            label="Auto-persist backup reminders"
+            description="Prompt to export an encrypted backup when you log out or close the window if changes are not backed up. On by default."
+            checked={store.settings.autoPersist}
+            onChange={(checked) => store.setSettings({ autoPersist: checked })}
           />
+          <p className="text-xs text-surface-500 dark:text-surface-400">
+            Last backup: {formatBackupTime(store.settings.lastBackupAt)}
+            {store.settings.backupPending ? ' · Changes pending backup' : ''}
+          </p>
+          <div className="flex flex-wrap gap-3">
+            <Button onClick={() => { setPasswordError(null); setExitAfterExport(false); setExportOpen(true) }}>
+              <Download className="h-4 w-4" /> Export encrypted
+            </Button>
+            <Button variant="outline" onClick={() => fileRef.current?.click()}>
+              <Upload className="h-4 w-4" /> Import backup
+            </Button>
+            <input
+              ref={fileRef}
+              type="file"
+              accept="application/json,.json"
+              className="hidden"
+              onChange={handleImportPick}
+            />
+          </div>
         </div>
       </Card>
 
@@ -180,7 +214,7 @@ export function SettingsPage() {
               onClick={() => {
                 store.resetAll()
                 setConfirmReset(false)
-                window.location.href = isApiMode() ? '/onboarding' : '/welcome'
+                window.location.href = isApiMode() ? '/onboarding' : '/'
               }}
             >
               Yes, delete everything
@@ -192,12 +226,30 @@ export function SettingsPage() {
         )}
       </Card>
 
+      <BackupLeaveModal
+        open={leaveOpen}
+        onCancel={() => setLeaveOpen(false)}
+        onLeaveWithoutBackup={() => {
+          setLeaveOpen(false)
+          performSessionExit()
+        }}
+        onExportBackup={() => {
+          setLeaveOpen(false)
+          setExitAfterExport(true)
+          setPasswordError(null)
+          setExportOpen(true)
+        }}
+      />
       <BackupPasswordModal
         open={exportOpen}
         mode="export"
         busy={busy}
         error={passwordError}
-        onClose={() => { if (!busy) setExportOpen(false) }}
+        onClose={() => {
+          if (busy) return
+          setExitAfterExport(false)
+          setExportOpen(false)
+        }}
         onSubmit={handleExport}
       />
       <BackupPasswordModal

@@ -70,7 +70,7 @@ export function OnboardingPage() {
       </Card>
 
       <div className="flex items-center justify-between">
-        <Button variant="ghost" onClick={step === 0 ? () => navigate('/welcome') : back}>
+        <Button variant="ghost" onClick={step === 0 ? () => navigate('/') : back}>
           <ChevronLeft className="h-4 w-4" />
           Back
         </Button>

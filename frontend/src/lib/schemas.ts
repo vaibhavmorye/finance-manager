@@ -220,6 +220,9 @@ export const expenseEntrySchema = z.object({
 
 export const settingsSchema = z.object({
   theme: z.enum(['light', 'dark', 'system']),
+  autoPersist: z.boolean().default(true),
+  lastBackupAt: z.string().nullable().default(null),
+  backupPending: z.boolean().default(false),
 })
 
 export const financeDataSchema = z.object({

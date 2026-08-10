@@ -2,6 +2,7 @@ import { useEffect } from 'react'
 import { BrowserRouter, Routes, Route, Navigate, Outlet } from 'react-router-dom'
 import { useFinanceStore } from '@/store/financeStore'
 import { useTheme } from '@/hooks/useTheme'
+import { useBackupBeforeUnload } from '@/lib/backupGuard'
 import { isApiMode, hasToken } from '@/lib/api'
 import { AppLayout } from '@/components/layout/AppLayout'
 import { WelcomePage } from '@/pages/WelcomePage'
@@ -28,12 +29,34 @@ function ThemeBoot() {
   return null
 }
 
+function BackupGuard() {
+  useBackupBeforeUnload()
+  return null
+}
+
 function Loading() {
   return (
     <div className="flex min-h-svh items-center justify-center">
       <div className="h-8 w-8 animate-spin rounded-full border-2 border-brand-500 border-t-transparent" />
     </div>
   )
+}
+
+/** `/` is the homepage: welcome for new local users, dashboard once onboarded. */
+function HomeGate() {
+  const hydrated = useFinanceStore((s) => s.hydrated)
+  const complete = useFinanceStore((s) => s.profile.onboardingComplete)
+
+  if (!hydrated) return <Loading />
+
+  if (isApiMode()) {
+    if (!hasToken()) return <Navigate to="/auth" replace />
+    if (!complete) return <Navigate to="/onboarding" replace />
+    return <AppLayout />
+  }
+
+  if (!complete) return <WelcomePage />
+  return <AppLayout />
 }
 
 function RequireOnboarding() {
@@ -47,7 +70,7 @@ function RequireOnboarding() {
   }
 
   if (!complete) {
-    return <Navigate to={isApiMode() ? '/onboarding' : '/welcome'} replace />
+    return <Navigate to={isApiMode() ? '/onboarding' : '/'} replace />
   }
 
   return <Outlet />
@@ -64,7 +87,7 @@ function RootRedirect() {
     return <Navigate to={complete ? '/' : '/onboarding'} replace />
   }
 
-  return <Navigate to={complete ? '/' : '/welcome'} replace />
+  return <Navigate to="/" replace />
 }
 
 export default function App() {
@@ -77,9 +100,13 @@ export default function App() {
   return (
     <BrowserRouter>
       <ThemeBoot />
+      <BackupGuard />
       <Routes>
-        <Route path="/welcome" element={isApiMode() ? <Navigate to="/auth" replace /> : <WelcomePage />} />
-        <Route path="/auth" element={isApiMode() ? <AuthPage /> : <Navigate to="/welcome" replace />} />
+        <Route path="/" element={<HomeGate />}>
+          <Route index element={<DashboardPage />} />
+        </Route>
+        <Route path="/welcome" element={<Navigate to="/" replace />} />
+        <Route path="/auth" element={isApiMode() ? <AuthPage /> : <Navigate to="/" replace />} />
         <Route
           path="/onboarding"
           element={
@@ -87,6 +114,7 @@ export default function App() {
           }
         />
 
+        {/* Calculators are public — no login / onboarding required. */}
         <Route element={<AppLayout />}>
           <Route path="/calculators" element={<CalculatorsPage />} />
           <Route path="/calculators/home-loan" element={<HomeLoanCalculatorPage />} />
@@ -98,7 +126,6 @@ export default function App() {
 
         <Route element={<RequireOnboarding />}>
           <Route element={<AppLayout />}>
-            <Route path="/" element={<DashboardPage />} />
             <Route path="/income" element={<IncomePage />} />
             <Route path="/investments" element={<InvestmentsPage />} />
             <Route path="/goals" element={<GoalsPage />} />

@@ -180,7 +180,14 @@ router.get('/snapshot', async (req: AuthRequest, res, next) => {
         date: toDateString(e.date),
         notes: e.notes ?? undefined,
       })),
-      settings: { theme: (user.settings?.theme ?? 'system') as 'light' | 'dark' | 'system' },
+      settings: {
+        theme: (user.settings?.theme ?? 'system') as 'light' | 'dark' | 'system',
+        autoPersist: user.settings?.autoPersist ?? true,
+        lastBackupAt: user.settings?.lastBackupAt
+          ? user.settings.lastBackupAt.toISOString()
+          : null,
+        backupPending: user.settings?.backupPending ?? false,
+      },
       taxProfile: normalizeTaxProfile(user.settings?.taxProfile),
     })
   } catch (err) {
@@ -232,10 +239,20 @@ router.put('/snapshot', async (req: AuthRequest, res, next) => {
         create: {
           userId,
           theme: data.settings?.theme ?? 'system',
+          autoPersist: data.settings?.autoPersist ?? true,
+          lastBackupAt: data.settings?.lastBackupAt
+            ? new Date(data.settings.lastBackupAt)
+            : null,
+          backupPending: data.settings?.backupPending ?? false,
           taxProfile: data.taxProfile ?? normalizeTaxProfile(null),
         },
         update: {
           theme: data.settings?.theme ?? 'system',
+          autoPersist: data.settings?.autoPersist ?? true,
+          lastBackupAt: data.settings?.lastBackupAt
+            ? new Date(data.settings.lastBackupAt)
+            : null,
+          backupPending: data.settings?.backupPending ?? false,
           taxProfile: data.taxProfile ?? normalizeTaxProfile(null),
         },
       })

@@ -277,6 +277,15 @@ export interface ExpenseEntry {
 
 export interface AppSettings {
   theme: 'light' | 'dark' | 'system'
+  /**
+   * When on (default), prompt to export an encrypted backup if there are
+   * changes since the last backup — on logout and when closing the window.
+   */
+  autoPersist: boolean
+  /** ISO timestamp of the last successful encrypted backup export. */
+  lastBackupAt: string | null
+  /** True when finance data changed since the last encrypted backup. */
+  backupPending: boolean
 }
 
 export interface FinanceData {
@@ -466,7 +475,7 @@ export function createDefaultData(): FinanceData {
     expenses: [],
     expenseEntries: [],
     taxProfile: createDefaultTaxProfile(),
-    settings: { theme: 'system' },
+    settings: { theme: 'system', autoPersist: true, lastBackupAt: null, backupPending: false },
   }
 }
 

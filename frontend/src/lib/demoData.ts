@@ -435,6 +435,6 @@ export function createDemoData(now = new Date()): FinanceData {
       isMetro: true,
       section24b: 200_000,
     },
-    settings: { theme: 'system' },
+    settings: { theme: 'system', autoPersist: true, lastBackupAt: null, backupPending: false },
   }
 }

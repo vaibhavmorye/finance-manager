@@ -41,7 +41,7 @@ interface FinanceStore extends FinanceData {
   importData: (file: File, password?: string) => Promise<void>
   /** Load sample Indian household data and mark onboarding complete. */
   loadDemoData: () => void
-  /** Export encrypted JSON backup. Password is required. */
+  /** Export encrypted JSON backup. Password is required. Clears backup-pending on success. */
   exportData: (password: string) => Promise<void>
   setProfile: (profile: Partial<Profile>) => void
   setSalary: (salary: Salary) => void
@@ -73,7 +73,29 @@ interface FinanceStore extends FinanceData {
   completeOnboarding: () => void
 }
 
+function normalizeSettings(settings?: Partial<AppSettings> | null): AppSettings {
+  const lastBackupAt = settings?.lastBackupAt ?? null
+  const backupPending =
+    settings?.backupPending ??
+    // Legacy snapshots without the flag: treat onboarded + never backed up as pending.
+    false
+  return {
+    theme: settings?.theme ?? 'system',
+    autoPersist: settings?.autoPersist ?? true,
+    lastBackupAt,
+    backupPending,
+  }
+}
+
 function normalizeLoaded(data: FinanceData): Partial<FinanceData> {
+  let settings = normalizeSettings(data.settings)
+  if (
+    !settings.backupPending &&
+    settings.lastBackupAt == null &&
+    data.profile?.onboardingComplete
+  ) {
+    settings = { ...settings, backupPending: true }
+  }
   return {
     ...data,
     salary: {
@@ -86,6 +108,7 @@ function normalizeLoaded(data: FinanceData): Partial<FinanceData> {
     savingPots: data.savingPots ?? [],
     expenseEntries: data.expenseEntries ?? [],
     taxProfile: data.taxProfile ?? createDefaultTaxProfile(),
+    settings,
   }
 }
 
@@ -150,7 +173,18 @@ function syncStocksFromTrades(trades: Trade[], existingStocks: Stock[]): Stock[]
 
 let syncTimer: ReturnType<typeof setTimeout> | null = null
 
-function persist(get: () => FinanceStore) {
+type StoreSet = (
+  partial:
+    | Partial<FinanceStore>
+    | ((state: FinanceStore) => Partial<FinanceStore>),
+) => void
+
+function persist(get: () => FinanceStore, set: StoreSet, options?: { skipDirty?: boolean }) {
+  if (!options?.skipDirty && !get().settings.backupPending) {
+    set((s) => ({
+      settings: { ...normalizeSettings(s.settings), backupPending: true },
+    }))
+  }
   const data = toData(get)
   saveToLocalStorage(data)
 
@@ -161,6 +195,13 @@ function persist(get: () => FinanceStore) {
     }, 600)
   }
 }
+
+const SETTINGS_PREF_KEYS = new Set<keyof AppSettings>([
+  'theme',
+  'autoPersist',
+  'lastBackupAt',
+  'backupPending',
+])
 
 export const useFinanceStore = create<FinanceStore>((set, get) => ({
   ...createDefaultData(),
@@ -198,29 +239,49 @@ export const useFinanceStore = create<FinanceStore>((set, get) => ({
 
   importData: async (file: File, password?: string) => {
     const data = await importFromJsonFile(file, password)
-    saveToLocalStorage(data)
-    set({ ...normalizeLoaded(data), hydrated: true })
+    const stamped: FinanceData = {
+      ...data,
+      settings: {
+        ...normalizeSettings(data.settings),
+        lastBackupAt: new Date().toISOString(),
+        backupPending: false,
+      },
+    }
+    saveToLocalStorage(stamped)
+    set({ ...normalizeLoaded(stamped), hydrated: true })
     if (isApiMode() && hasToken()) {
-      await saveSnapshot(data)
+      await saveSnapshot(stamped)
     }
   },
 
   loadDemoData: () => {
     const data = createDemoData()
-    saveToLocalStorage(data)
-    set({ ...normalizeLoaded(data), hydrated: true })
+    const stamped: FinanceData = {
+      ...data,
+      settings: { ...normalizeSettings(data.settings), backupPending: true },
+    }
+    saveToLocalStorage(stamped)
+    set({ ...normalizeLoaded(stamped), hydrated: true })
     if (isApiMode() && hasToken()) {
-      saveSnapshot(data).catch((err) => console.error('Failed to sync demo to API', err))
+      saveSnapshot(stamped).catch((err) => console.error('Failed to sync demo to API', err))
     }
   },
 
   exportData: async (password: string) => {
     await exportToJsonFile(toData(get), password)
+    set((s) => ({
+      settings: {
+        ...normalizeSettings(s.settings),
+        lastBackupAt: new Date().toISOString(),
+        backupPending: false,
+      },
+    }))
+    persist(get, set, { skipDirty: true })
   },
 
   setProfile: (profile) => {
     set((s) => ({ profile: { ...s.profile, ...profile } }))
-    persist(get)
+    persist(get, set)
   },
 
   setSalary: (salary) => {
@@ -230,22 +291,22 @@ export const useFinanceStore = create<FinanceStore>((set, get) => ({
         monthlyInHand: salary.monthlyInHand ?? 0,
       },
     })
-    persist(get)
+    persist(get, set)
   },
 
   setOtherIncomes: (otherIncomes) => {
     set({ otherIncomes })
-    persist(get)
+    persist(get, set)
   },
 
   setStocks: (stocks) => {
     set({ stocks })
-    persist(get)
+    persist(get, set)
   },
 
   setTrades: (trades) => {
     set({ trades })
-    persist(get)
+    persist(get, set)
   },
 
   setTradeExitType: (tradeIds, exitType) => {
@@ -261,7 +322,7 @@ export const useFinanceStore = create<FinanceStore>((set, get) => ({
       return { ...t, exitType }
     })
     set({ trades })
-    persist(get)
+    persist(get, set)
   },
 
   addTradesFromTradebook: (incoming, opts) => {
@@ -270,28 +331,28 @@ export const useFinanceStore = create<FinanceStore>((set, get) => ({
     const stocks = sync ? syncStocksFromTrades(trades, get().stocks) : get().stocks
     const analysis = analyzeTradebook(trades)
     set({ trades, stocks })
-    persist(get)
+    persist(get, set)
     return { added, skipped, analysis }
   },
 
   clearTrades: () => {
     set({ trades: [] })
-    persist(get)
+    persist(get, set)
   },
 
   setFixedDeposits: (fixedDeposits) => {
     set({ fixedDeposits })
-    persist(get)
+    persist(get, set)
   },
 
   setMutualFunds: (mutualFunds) => {
     set({ mutualFunds })
-    persist(get)
+    persist(get, set)
   },
 
   setMfTransactions: (mfTransactions) => {
     set({ mfTransactions })
-    persist(get)
+    persist(get, set)
   },
 
   addMfTransactions: (incoming) => {
@@ -300,59 +361,61 @@ export const useFinanceStore = create<FinanceStore>((set, get) => ({
       incoming,
     )
     set({ mfTransactions: transactions })
-    persist(get)
+    persist(get, set)
     return { added, skipped }
   },
 
   setOtherAssets: (otherAssets) => {
     set({ otherAssets })
-    persist(get)
+    persist(get, set)
   },
 
   setSavingPots: (savingPots) => {
     set({ savingPots })
-    persist(get)
+    persist(get, set)
   },
 
   setHomeLoans: (homeLoans) => {
     set({ homeLoans })
-    persist(get)
+    persist(get, set)
   },
 
   setOtherDebts: (otherDebts) => {
     set({ otherDebts })
-    persist(get)
+    persist(get, set)
   },
 
   setHealthInsurance: (healthInsurance) => {
     set({ healthInsurance })
-    persist(get)
+    persist(get, set)
   },
 
   setExpenses: (expenses) => {
     set({ expenses })
-    persist(get)
+    persist(get, set)
   },
 
   setExpenseEntries: (expenseEntries) => {
     set({ expenseEntries })
-    persist(get)
+    persist(get, set)
   },
 
   setTaxProfile: (profile) => {
     set((s) => ({
       taxProfile: { ...(s.taxProfile ?? createDefaultTaxProfile()), ...profile },
     }))
-    persist(get)
+    persist(get, set)
   },
 
   setSettings: (settings) => {
-    set((s) => ({ settings: { ...s.settings, ...settings } }))
-    persist(get)
+    const keys = Object.keys(settings) as (keyof AppSettings)[]
+    const onlyPrefs = keys.length > 0 && keys.every((k) => SETTINGS_PREF_KEYS.has(k))
+    set((s) => ({ settings: { ...normalizeSettings(s.settings), ...settings } }))
+    persist(get, set, { skipDirty: onlyPrefs })
   },
 
   completeOnboarding: () => {
     set((s) => ({ profile: { ...s.profile, onboardingComplete: true } }))
-    persist(get)
+    persist(get, set)
   },
 }))

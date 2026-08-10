@@ -248,9 +248,12 @@ model ExpenseEntry {
 }
 
 model UserSettings {
-  id         String @id @default(uuid())
-  userId     String @unique
-  theme      String @default("system")
-  taxProfile Json?
-  user       User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  id            String    @id @default(uuid())
+  userId        String    @unique
+  theme         String    @default("system")
+  autoPersist   Boolean   @default(true)
+  lastBackupAt  DateTime?
+  backupPending Boolean   @default(false)
+  taxProfile    Json?
+  user          User      @relation(fields: [userId], references: [id], onDelete: Cascade)
 }
