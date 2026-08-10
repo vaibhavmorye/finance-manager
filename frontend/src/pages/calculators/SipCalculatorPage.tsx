@@ -10,12 +10,14 @@ import {
   CartesianGrid,
   Legend,
 } from 'recharts'
-import { ArrowLeft } from 'lucide-react'
-import { Card, CardHeader, CardTitle, Input, StatCard, Checkbox, Badge } from '@/components/ui'
+import { ArrowLeft, Target } from 'lucide-react'
+import { Card, CardHeader, CardTitle, Input, StatCard, Checkbox, Badge, Button } from '@/components/ui'
+import { CreatePotModal, type CreatePotDraft } from '@/components/CreatePotModal'
 import { useFinanceStore } from '@/store/financeStore'
 import { formatCurrency } from '@/lib/utils'
 import { calculateSip } from '@/lib/finance/sip'
 import { monthlySipTotal, mfValue } from '@/lib/finance/networth'
+import { addMonthsIso, todayIso } from '@/lib/finance/interest'
 
 export function SipCalculatorPage() {
   const store = useFinanceStore()
@@ -41,6 +43,7 @@ export function SipCalculatorPage() {
   const [returnPct, setReturnPct] = useState('12')
   const [years, setYears] = useState('15')
   const [stepUp, setStepUp] = useState('0')
+  const [createOpen, setCreateOpen] = useState(false)
 
   const effectiveMonthly = includeRunning
     ? runningSipTotal + (Number(extraMonthly) || 0)
@@ -66,14 +69,39 @@ export function SipCalculatorPage() {
     }
   }
 
+  const draft: CreatePotDraft = useMemo(() => {
+    const start = todayIso()
+    const targetDate = addMonthsIso(start, (Number(years) || 0) * 12)
+    return {
+      purpose: 'education',
+      name: 'Education SIP',
+      vehicle: 'mf',
+      planMode: 'accumulate',
+      targetAmount: result.futureValue,
+      targetDate,
+      currentAmount: includeRunning ? mfCorpus : 0,
+      monthlyAmount: effectiveMonthly,
+      expectedReturnPercent: Number(returnPct) || 0,
+      mfCurrentValue: includeRunning ? mfCorpus : 0,
+      mfInvestedAmount: includeRunning ? mfInvested : 0,
+      mfMonthlySip: effectiveMonthly,
+      createHoldingDefault: true,
+    }
+  }, [result, years, includeRunning, mfCorpus, mfInvested, effectiveMonthly, returnPct])
+
   return (
     <div className="mx-auto max-w-5xl space-y-6">
-      <div>
-        <Link to="/calculators" className="mb-2 inline-flex items-center gap-1 text-sm text-surface-500 hover:text-surface-700">
-          <ArrowLeft className="h-3.5 w-3.5" /> Calculators
-        </Link>
-        <h1 className="text-2xl font-bold text-surface-900 dark:text-surface-50">SIP calculator</h1>
-        <p className="text-sm text-surface-500">Project systematic investment plan growth</p>
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div>
+          <Link to="/calculators" className="mb-2 inline-flex items-center gap-1 text-sm text-surface-500 hover:text-surface-700">
+            <ArrowLeft className="h-3.5 w-3.5" /> Calculators
+          </Link>
+          <h1 className="text-2xl font-bold text-surface-900 dark:text-surface-50">SIP calculator</h1>
+          <p className="text-sm text-surface-500">Project systematic investment plan growth</p>
+        </div>
+        <Button onClick={() => setCreateOpen(true)}>
+          <Target className="h-4 w-4" /> Create MF pot
+        </Button>
       </div>
 
       <div className="grid gap-6 lg:grid-cols-5">
@@ -186,6 +214,13 @@ export function SipCalculatorPage() {
           </Card>
         </div>
       </div>
+
+      <CreatePotModal
+        open={createOpen}
+        onClose={() => setCreateOpen(false)}
+        draft={draft}
+        title="Create MF accumulate pot"
+      />
     </div>
   )
 }

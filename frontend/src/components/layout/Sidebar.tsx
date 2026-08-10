@@ -11,19 +11,22 @@ import {
   Moon,
   Sun,
   FileText,
+  LogOut,
+  Target,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { useTheme } from '@/hooks/useTheme'
 import { useFinanceStore } from '@/store/financeStore'
 import { formatCurrency } from '@/lib/utils'
 import { calculateNetWorth } from '@/lib/finance/networth'
-import { isApiMode } from '@/lib/api'
+import { isApiMode, logout } from '@/lib/api'
 import { useMemo } from 'react'
 
 const nav = [
   { to: '/', label: 'Dashboard', icon: LayoutDashboard },
   { to: '/income', label: 'Income', icon: Wallet },
   { to: '/investments', label: 'Investments', icon: TrendingUp },
+  { to: '/goals', label: 'Goals', icon: Target },
   { to: '/debts', label: 'Debts', icon: Landmark },
   { to: '/cashflow', label: 'Cash flow', icon: Receipt },
   { to: '/tax', label: 'Tax', icon: FileText },
@@ -37,6 +40,17 @@ export function Sidebar() {
   const store = useFinanceStore()
   const netWorth = useMemo(() => calculateNetWorth(store), [store])
   const currency = store.profile.currency
+
+  const handleLogout = () => {
+    if (isApiMode()) {
+      logout()
+      store.resetAll()
+      window.location.href = '/auth'
+      return
+    }
+    store.resetAll()
+    window.location.href = '/welcome'
+  }
 
   return (
     <aside className="hidden w-64 shrink-0 flex-col border-r border-surface-200 bg-white dark:border-surface-800 dark:bg-surface-900 lg:flex">
@@ -89,7 +103,17 @@ export function Sidebar() {
           {theme === 'dark' ? 'Light mode' : 'Dark mode'}
         </button>
         {store.profile.name && (
-          <p className="mt-2 truncate px-3 text-xs text-surface-400">Hi, {store.profile.name}</p>
+          <div className="mt-2 px-3">
+            <p className="truncate text-xs text-surface-400">Hi, {store.profile.name}</p>
+            <button
+              type="button"
+              onClick={handleLogout}
+              className="mt-1.5 flex items-center gap-1.5 text-xs font-medium text-surface-500 transition hover:text-accent-rose dark:text-surface-400 dark:hover:text-accent-rose"
+            >
+              <LogOut className="h-3.5 w-3.5" />
+              Log out
+            </button>
+          </div>
         )}
       </div>
     </aside>

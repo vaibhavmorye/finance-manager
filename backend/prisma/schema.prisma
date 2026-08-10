@@ -22,6 +22,7 @@ model User {
   mutualFunds     MutualFund[]
   mfTransactions  MfTransaction[]
   otherAssets     OtherAsset[]
+  savingPots      SavingPot[]
   homeLoans       HomeLoan[]
   otherDebts      OtherDebt[]
   healthInsurance HealthInsurance[]
@@ -126,6 +127,27 @@ model OtherAsset {
   buyPrice     Float
   currentPrice Float
   user         User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+}
+
+model SavingPot {
+  id                     String    @id @default(uuid())
+  userId                 String
+  name                   String
+  purpose                String
+  vehicle                String
+  targetAmount           Float
+  targetDate             DateTime? @db.Date
+  currentAmount          Float     @default(0)
+  monthlyAmount          Float     @default(0)
+  expectedReturnPercent  Float     @default(0)
+  planMode               String    @default("accumulate")
+  swpYears               Float?
+  swpCorpus              Float?
+  linkedFixedDepositId   String?
+  linkedMutualFundId     String?
+  user                   User      @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([userId])
 }

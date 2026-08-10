@@ -1,5 +1,5 @@
 import { Link } from 'react-router-dom'
-import { Landmark, Flame, Repeat } from 'lucide-react'
+import { Landmark, Flame, Repeat, Percent, ArrowDownToLine } from 'lucide-react'
 import { Card } from '@/components/ui'
 
 const calculators = [
@@ -20,9 +20,23 @@ const calculators = [
   {
     to: '/calculators/sip',
     title: 'SIP calculator',
-    description: 'Project SIP growth with step-up — optionally include your current running SIPs.',
+    description: 'Project SIP growth with step-up — optionally create an MF accumulate pot.',
     icon: Repeat,
     color: 'bg-sky-50 text-sky-700 dark:bg-sky-900/30 dark:text-sky-300',
+  },
+  {
+    to: '/calculators/swp',
+    title: 'SWP calculator',
+    description: 'Systematic withdrawal plan — create a retirement MF pot & plan from results.',
+    icon: ArrowDownToLine,
+    color: 'bg-emerald-50 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300',
+  },
+  {
+    to: '/calculators/interest',
+    title: 'Interest calculator',
+    description: 'FD maturity, required principal, or recurring deposits — create an FD goal pot.',
+    icon: Percent,
+    color: 'bg-violet-50 text-violet-700 dark:bg-violet-900/30 dark:text-violet-300',
   },
 ]
 

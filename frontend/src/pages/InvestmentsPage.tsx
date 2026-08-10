@@ -18,6 +18,7 @@ import {
   type OtherAsset,
   type OtherAssetKind,
   type Stock,
+  POT_PURPOSE_LABELS,
 } from '@/types/finance'
 import { stocksValue, fdValue, mfValue, otherAssetsValue } from '@/lib/finance/networth'
 import { analyzeMfTradebook } from '@/lib/finance/mf-tradebook'
@@ -126,6 +127,28 @@ export function InvestmentsPage() {
     }
     return map
   }, [store.mfTransactions])
+
+  const potsByMfId = useMemo(() => {
+    const map = new Map<string, string[]>()
+    for (const p of store.savingPots ?? []) {
+      if (!p.linkedMutualFundId) continue
+      const labels = map.get(p.linkedMutualFundId) ?? []
+      labels.push(POT_PURPOSE_LABELS[p.purpose])
+      map.set(p.linkedMutualFundId, labels)
+    }
+    return map
+  }, [store.savingPots])
+
+  const potsByFdId = useMemo(() => {
+    const map = new Map<string, string[]>()
+    for (const p of store.savingPots ?? []) {
+      if (!p.linkedFixedDepositId) continue
+      const labels = map.get(p.linkedFixedDepositId) ?? []
+      labels.push(POT_PURPOSE_LABELS[p.purpose])
+      map.set(p.linkedFixedDepositId, labels)
+    }
+    return map
+  }, [store.savingPots])
 
   return (
     <div className="mx-auto max-w-6xl space-y-6">
@@ -303,6 +326,7 @@ export function InvestmentsPage() {
               const cat = m.fundCategory === 'debt' ? 'debt' : 'equity'
               const lotInvested = mfAnalysis.byFund.find((f) => f.fundId === m.id)?.invested
               const txCount = mfTxCountByFund.get(m.id) ?? 0
+              const potLabels = potsByMfId.get(m.id) ?? []
               return (
                 <Card key={m.id} className="!p-4">
                   <div className="flex flex-wrap items-start justify-between gap-3">
@@ -310,6 +334,11 @@ export function InvestmentsPage() {
                       <div className="flex flex-wrap items-center gap-2">
                         <p className="font-medium text-surface-900 dark:text-surface-50">{m.name}</p>
                         <Badge variant="info">{FUND_CATEGORY_LABELS[cat]}</Badge>
+                        {potLabels.map((label) => (
+                          <Badge key={label} variant="success">
+                            {label}
+                          </Badge>
+                        ))}
                       </div>
                       <p className="mt-1 text-xs text-surface-400">
                         Invested{' '}
@@ -361,6 +390,7 @@ export function InvestmentsPage() {
             title: f.name,
             sub: `${f.interestRate}% · matures ${f.maturityDate}`,
             value: f.principal,
+            badges: potsByFdId.get(f.id),
           }))}
           currency={currency}
           onRemove={(id) => store.setFixedDeposits(store.fixedDeposits.filter((f) => f.id !== id))}
@@ -1136,7 +1166,7 @@ function AssetList({
   onAdd,
 }: {
   empty: string
-  items: { id: string; title: string; sub: string; value: number }[]
+  items: { id: string; title: string; sub: string; value: number; badges?: string[] }[]
   currency: 'INR' | 'USD' | 'EUR' | 'GBP'
   onEdit?: (id: string) => void
   onRemove: (id: string) => void
@@ -1150,7 +1180,14 @@ function AssetList({
       {items.map((item) => (
         <Card key={item.id} className="flex items-center justify-between !p-4">
           <div>
-            <p className="font-medium text-surface-900 dark:text-surface-50">{item.title}</p>
+            <div className="flex flex-wrap items-center gap-2">
+              <p className="font-medium text-surface-900 dark:text-surface-50">{item.title}</p>
+              {(item.badges ?? []).map((label) => (
+                <Badge key={label} variant="warning">
+                  {label}
+                </Badge>
+              ))}
+            </div>
             <p className="text-xs text-surface-400">{item.sub}</p>
           </div>
           <div className="flex items-center gap-2">

@@ -105,6 +105,40 @@ export interface FixedDeposit {
   maturityDate: string
 }
 
+/** Goal purpose for a saving pot. */
+export type PotPurpose = 'emergency' | 'education' | 'retirement' | 'custom'
+
+/** Funding vehicle linked to a pot. */
+export type PotVehicle = 'fd' | 'mf'
+
+/** Accumulate (SIP / deposit) vs withdraw (SWP). */
+export type PotPlanMode = 'accumulate' | 'withdraw'
+
+/**
+ * Goal-based saving pot — sits above FD / MF holdings.
+ * Optional links point at existing investments.
+ */
+export interface SavingPot {
+  id: string
+  name: string
+  purpose: PotPurpose
+  vehicle: PotVehicle
+  targetAmount: number
+  targetDate?: string
+  /** Tracked progress (can sync from linked holding). */
+  currentAmount: number
+  /** Monthly SIP in (accumulate) or SWP out (withdraw). */
+  monthlyAmount: number
+  expectedReturnPercent: number
+  planMode: PotPlanMode
+  /** SWP plan duration in years (when planMode === 'withdraw'). */
+  swpYears?: number
+  /** Starting corpus for SWP plan. */
+  swpCorpus?: number
+  linkedFixedDepositId?: string
+  linkedMutualFundId?: string
+}
+
 /** Equity-oriented vs debt / non-equity for capital-gains treatment. */
 export type FundCategory = 'equity' | 'debt'
 
@@ -256,6 +290,7 @@ export interface FinanceData {
   mutualFunds: MutualFund[]
   mfTransactions: MfTransaction[]
   otherAssets: OtherAsset[]
+  savingPots: SavingPot[]
   homeLoans: HomeLoan[]
   otherDebts: OtherDebt[]
   healthInsurance: HealthInsurance[]
@@ -314,6 +349,73 @@ export const FUND_CATEGORY_LABELS: Record<FundCategory, string> = {
 
 export const FUND_CATEGORY_OPTIONS: FundCategory[] = ['equity', 'debt']
 
+export const POT_PURPOSE_LABELS: Record<PotPurpose, string> = {
+  emergency: 'Emergency fund',
+  education: 'Education',
+  retirement: 'Retirement',
+  custom: 'Custom',
+}
+
+export const POT_PURPOSE_OPTIONS: PotPurpose[] = [
+  'emergency',
+  'education',
+  'retirement',
+  'custom',
+]
+
+export const POT_VEHICLE_LABELS: Record<PotVehicle, string> = {
+  fd: 'Fixed deposit',
+  mf: 'Mutual fund',
+}
+
+export const POT_VEHICLE_OPTIONS: PotVehicle[] = ['fd', 'mf']
+
+export const POT_PLAN_MODE_LABELS: Record<PotPlanMode, string> = {
+  accumulate: 'Accumulate',
+  withdraw: 'Withdraw (SWP)',
+}
+
+export const POT_PLAN_MODE_OPTIONS: PotPlanMode[] = ['accumulate', 'withdraw']
+
+/** Defaults when creating a pot from a purpose template. */
+export function potDefaultsForPurpose(purpose: PotPurpose): {
+  name: string
+  vehicle: PotVehicle
+  planMode: PotPlanMode
+  expectedReturnPercent: number
+} {
+  switch (purpose) {
+    case 'emergency':
+      return {
+        name: 'Emergency fund',
+        vehicle: 'fd',
+        planMode: 'accumulate',
+        expectedReturnPercent: 6.5,
+      }
+    case 'education':
+      return {
+        name: 'Education',
+        vehicle: 'mf',
+        planMode: 'accumulate',
+        expectedReturnPercent: 12,
+      }
+    case 'retirement':
+      return {
+        name: 'Retirement',
+        vehicle: 'mf',
+        planMode: 'accumulate',
+        expectedReturnPercent: 12,
+      }
+    default:
+      return {
+        name: 'Custom goal',
+        vehicle: 'mf',
+        planMode: 'accumulate',
+        expectedReturnPercent: 10,
+      }
+  }
+}
+
 export function defaultUnitForKind(kind: OtherAssetKind): string {
   return kind === 'gold' || kind === 'silver' ? 'g' : 'units'
 }
@@ -357,6 +459,7 @@ export function createDefaultData(): FinanceData {
     mutualFunds: [],
     mfTransactions: [],
     otherAssets: [],
+    savingPots: [],
     homeLoans: [],
     otherDebts: [],
     healthInsurance: [],

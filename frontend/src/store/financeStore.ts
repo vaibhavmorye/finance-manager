@@ -11,6 +11,7 @@ import type {
   MutualFund,
   MfTransaction,
   OtherAsset,
+  SavingPot,
   HomeLoan,
   OtherDebt,
   HealthInsurance,
@@ -30,6 +31,7 @@ import {
 import { isApiMode, fetchSnapshot, saveSnapshot, hasToken } from '@/lib/api'
 import { analyzeTradebook, mergeTrades } from '@/lib/finance/tradebook'
 import { mergeMfTransactions } from '@/lib/finance/mf-tradebook'
+import { createDemoData } from '@/lib/demoData'
 
 interface FinanceStore extends FinanceData {
   hydrated: boolean
@@ -37,6 +39,8 @@ interface FinanceStore extends FinanceData {
   hydrateFromApi: () => Promise<void>
   resetAll: () => void
   importData: (file: File) => Promise<void>
+  /** Load sample Indian household data and mark onboarding complete. */
+  loadDemoData: () => void
   exportData: () => void
   setProfile: (profile: Partial<Profile>) => void
   setSalary: (salary: Salary) => void
@@ -57,6 +61,7 @@ interface FinanceStore extends FinanceData {
   setMfTransactions: (items: MfTransaction[]) => void
   addMfTransactions: (incoming: MfTransaction[]) => { added: number; skipped: number }
   setOtherAssets: (items: OtherAsset[]) => void
+  setSavingPots: (items: SavingPot[]) => void
   setHomeLoans: (items: HomeLoan[]) => void
   setOtherDebts: (items: OtherDebt[]) => void
   setHealthInsurance: (items: HealthInsurance[]) => void
@@ -77,6 +82,7 @@ function normalizeLoaded(data: FinanceData): Partial<FinanceData> {
     trades: data.trades ?? [],
     mfTransactions: data.mfTransactions ?? [],
     otherAssets: data.otherAssets ?? [],
+    savingPots: data.savingPots ?? [],
     expenseEntries: data.expenseEntries ?? [],
     taxProfile: data.taxProfile ?? createDefaultTaxProfile(),
   }
@@ -95,6 +101,7 @@ function toData(get: () => FinanceStore): FinanceData {
     mutualFunds: state.mutualFunds,
     mfTransactions: state.mfTransactions ?? [],
     otherAssets: state.otherAssets ?? [],
+    savingPots: state.savingPots ?? [],
     homeLoans: state.homeLoans,
     otherDebts: state.otherDebts,
     healthInsurance: state.healthInsurance,
@@ -197,6 +204,15 @@ export const useFinanceStore = create<FinanceStore>((set, get) => ({
     }
   },
 
+  loadDemoData: () => {
+    const data = createDemoData()
+    saveToLocalStorage(data)
+    set({ ...normalizeLoaded(data), hydrated: true })
+    if (isApiMode() && hasToken()) {
+      saveSnapshot(data).catch((err) => console.error('Failed to sync demo to API', err))
+    }
+  },
+
   exportData: () => {
     exportToJsonFile(toData(get))
   },
@@ -289,6 +305,11 @@ export const useFinanceStore = create<FinanceStore>((set, get) => ({
 
   setOtherAssets: (otherAssets) => {
     set({ otherAssets })
+    persist(get)
+  },
+
+  setSavingPots: (savingPots) => {
+    set({ savingPots })
     persist(get)
   },
 

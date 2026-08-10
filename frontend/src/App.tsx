@@ -18,6 +18,9 @@ import { CalculatorsPage } from '@/pages/CalculatorsPage'
 import { HomeLoanCalculatorPage } from '@/pages/calculators/HomeLoanCalculatorPage'
 import { FireCalculatorPage } from '@/pages/calculators/FireCalculatorPage'
 import { SipCalculatorPage } from '@/pages/calculators/SipCalculatorPage'
+import { InterestCalculatorPage } from '@/pages/calculators/InterestCalculatorPage'
+import { SwpCalculatorPage } from '@/pages/calculators/SwpCalculatorPage'
+import { GoalsPage } from '@/pages/GoalsPage'
 import { SettingsPage } from '@/pages/SettingsPage'
 
 function ThemeBoot() {
@@ -89,6 +92,8 @@ export default function App() {
           <Route path="/calculators/home-loan" element={<HomeLoanCalculatorPage />} />
           <Route path="/calculators/fire" element={<FireCalculatorPage />} />
           <Route path="/calculators/sip" element={<SipCalculatorPage />} />
+          <Route path="/calculators/interest" element={<InterestCalculatorPage />} />
+          <Route path="/calculators/swp" element={<SwpCalculatorPage />} />
         </Route>
 
         <Route element={<RequireOnboarding />}>
@@ -96,6 +101,7 @@ export default function App() {
             <Route path="/" element={<DashboardPage />} />
             <Route path="/income" element={<IncomePage />} />
             <Route path="/investments" element={<InvestmentsPage />} />
+            <Route path="/goals" element={<GoalsPage />} />
             <Route path="/debts" element={<DebtsPage />} />
             <Route path="/cashflow" element={<CashFlowPage />} />
             <Route path="/expenses" element={<Navigate to="/cashflow" replace />} />

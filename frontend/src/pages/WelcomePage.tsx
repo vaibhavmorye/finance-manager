@@ -1,12 +1,13 @@
 import { useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Upload, UserPlus, Shield, Lock } from 'lucide-react'
+import { Upload, UserPlus, Shield, Lock, Sparkles } from 'lucide-react'
 import { Button } from '@/components/ui'
 import { useFinanceStore } from '@/store/financeStore'
 
 export function WelcomePage() {
   const navigate = useNavigate()
   const importData = useFinanceStore((s) => s.importData)
+  const loadDemoData = useFinanceStore((s) => s.loadDemoData)
   const fileRef = useRef<HTMLInputElement>(null)
 
   const handleImport = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -18,6 +19,11 @@ export function WelcomePage() {
     } catch (err) {
       alert(err instanceof Error ? err.message : 'Failed to import file')
     }
+  }
+
+  const handleDemo = () => {
+    loadDemoData()
+    navigate('/')
   }
 
   return (
@@ -40,6 +46,7 @@ export function WelcomePage() {
 
         <div className="space-y-3">
           <button
+            type="button"
             onClick={() => navigate('/onboarding')}
             className="group flex w-full items-center gap-4 rounded-2xl border border-surface-200 bg-white p-5 text-left shadow-sm transition hover:border-brand-300 hover:shadow-md dark:border-surface-700 dark:bg-surface-900 dark:hover:border-brand-700"
           >
@@ -55,6 +62,25 @@ export function WelcomePage() {
           </button>
 
           <button
+            type="button"
+            onClick={handleDemo}
+            className="group flex w-full items-center gap-4 rounded-2xl border border-surface-200 bg-white p-5 text-left shadow-sm transition hover:border-brand-300 hover:shadow-md dark:border-surface-700 dark:bg-surface-900 dark:hover:border-brand-700"
+          >
+            <span className="flex h-12 w-12 items-center justify-center rounded-xl bg-amber-50 text-amber-700 transition group-hover:bg-amber-600 group-hover:text-white dark:bg-amber-900/30 dark:text-amber-400">
+              <Sparkles className="h-5 w-5" />
+            </span>
+            <span>
+              <span className="block font-semibold text-surface-900 dark:text-surface-50">
+                Checkout demo
+              </span>
+              <span className="text-sm text-surface-500">
+                Explore with a sample Bengaluru household (~₹18 LPA)
+              </span>
+            </span>
+          </button>
+
+          <button
+            type="button"
             onClick={() => fileRef.current?.click()}
             className="group flex w-full items-center gap-4 rounded-2xl border border-surface-200 bg-white p-5 text-left shadow-sm transition hover:border-brand-300 hover:shadow-md dark:border-surface-700 dark:bg-surface-900 dark:hover:border-brand-700"
           >

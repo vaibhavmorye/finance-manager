@@ -84,6 +84,27 @@ export const fixedDepositSchema = z.object({
   maturityDate: z.string(),
 })
 
+export const potPurposeSchema = z.enum(['emergency', 'education', 'retirement', 'custom'])
+export const potVehicleSchema = z.enum(['fd', 'mf'])
+export const potPlanModeSchema = z.enum(['accumulate', 'withdraw'])
+
+export const savingPotSchema = z.object({
+  id: z.string(),
+  name: z.string().min(1),
+  purpose: potPurposeSchema,
+  vehicle: potVehicleSchema,
+  targetAmount: z.number().min(0),
+  targetDate: z.string().optional(),
+  currentAmount: z.number().min(0),
+  monthlyAmount: z.number().min(0),
+  expectedReturnPercent: z.number().min(0),
+  planMode: potPlanModeSchema,
+  swpYears: z.number().min(0).optional(),
+  swpCorpus: z.number().min(0).optional(),
+  linkedFixedDepositId: z.string().optional(),
+  linkedMutualFundId: z.string().optional(),
+})
+
 export const mutualFundSchema = z.object({
   id: z.string(),
   name: z.string().min(1),
@@ -212,6 +233,7 @@ export const financeDataSchema = z.object({
   mutualFunds: z.array(mutualFundSchema),
   mfTransactions: z.array(mfTransactionSchema).default([]),
   otherAssets: z.array(otherAssetSchema).default([]),
+  savingPots: z.array(savingPotSchema).default([]),
   homeLoans: z.array(homeLoanSchema),
   otherDebts: z.array(otherDebtSchema),
   healthInsurance: z.array(healthInsuranceSchema),

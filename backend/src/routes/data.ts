@@ -48,6 +48,7 @@ router.get('/snapshot', async (req: AuthRequest, res, next) => {
         mutualFunds: true,
         mfTransactions: true,
         otherAssets: true,
+        savingPots: true,
         homeLoans: { include: { rateChanges: true, prepayments: true } },
         otherDebts: true,
         healthInsurance: true,
@@ -115,6 +116,24 @@ router.get('/snapshot', async (req: AuthRequest, res, next) => {
         unit: a.unit,
         buyPrice: a.buyPrice,
         currentPrice: a.currentPrice,
+      })),
+      savingPots: (user.savingPots ?? []).map((p) => ({
+        id: p.id,
+        name: p.name,
+        purpose: p.purpose as 'emergency' | 'education' | 'retirement' | 'custom',
+        vehicle: p.vehicle as 'fd' | 'mf',
+        targetAmount: p.targetAmount,
+        targetDate: p.targetDate ? toDateString(p.targetDate) : undefined,
+        currentAmount: p.currentAmount,
+        monthlyAmount: p.monthlyAmount,
+        expectedReturnPercent: p.expectedReturnPercent,
+        planMode: (p.planMode === 'withdraw' ? 'withdraw' : 'accumulate') as
+          | 'accumulate'
+          | 'withdraw',
+        swpYears: p.swpYears ?? undefined,
+        swpCorpus: p.swpCorpus ?? undefined,
+        linkedFixedDepositId: p.linkedFixedDepositId ?? undefined,
+        linkedMutualFundId: p.linkedMutualFundId ?? undefined,
       })),
       homeLoans: user.homeLoans.map((l) => ({
         id: l.id,
@@ -356,6 +375,46 @@ router.put('/snapshot', async (req: AuthRequest, res, next) => {
               unit: a.unit ?? 'g',
               buyPrice: a.buyPrice,
               currentPrice: a.currentPrice,
+            }),
+          ),
+        })
+      }
+
+      await tx.savingPot.deleteMany({ where: { userId } })
+      if (data.savingPots?.length) {
+        await tx.savingPot.createMany({
+          data: data.savingPots.map(
+            (p: {
+              id?: string
+              name: string
+              purpose: string
+              vehicle: string
+              targetAmount: number
+              targetDate?: string
+              currentAmount?: number
+              monthlyAmount?: number
+              expectedReturnPercent?: number
+              planMode?: string
+              swpYears?: number
+              swpCorpus?: number
+              linkedFixedDepositId?: string
+              linkedMutualFundId?: string
+            }) => ({
+              id: p.id,
+              userId,
+              name: p.name,
+              purpose: p.purpose,
+              vehicle: p.vehicle,
+              targetAmount: p.targetAmount,
+              targetDate: p.targetDate ? new Date(p.targetDate) : null,
+              currentAmount: p.currentAmount ?? 0,
+              monthlyAmount: p.monthlyAmount ?? 0,
+              expectedReturnPercent: p.expectedReturnPercent ?? 0,
+              planMode: p.planMode === 'withdraw' ? 'withdraw' : 'accumulate',
+              swpYears: p.swpYears ?? null,
+              swpCorpus: p.swpCorpus ?? null,
+              linkedFixedDepositId: p.linkedFixedDepositId ?? null,
+              linkedMutualFundId: p.linkedMutualFundId ?? null,
             }),
           ),
         })
