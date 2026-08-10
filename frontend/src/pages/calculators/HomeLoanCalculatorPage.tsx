@@ -74,7 +74,7 @@ export function HomeLoanCalculatorPage() {
       calculatePrepaymentPlan({
         ...input,
         extraAmount: Number(extra) || 0,
-        frequency: freq === 'lump_sum' ? 'monthly' : freq,
+        frequency: freq,
         mode,
       }),
     [input, extra, freq, mode],
@@ -169,7 +169,11 @@ export function HomeLoanCalculatorPage() {
                 onChange={(e) => setFreq(e.target.value as PrepaymentFrequency)}
                 options={[
                   { value: 'monthly', label: 'Monthly' },
+                  { value: 'quarterly', label: 'Quarterly' },
+                  { value: 'half_yearly', label: 'Half-yearly' },
+                  { value: 'annually', label: 'Annually' },
                   { value: 'weekly', label: 'Weekly' },
+                  { value: 'one_time', label: 'One-time' },
                 ]}
               />
               <Select

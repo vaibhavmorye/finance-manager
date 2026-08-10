@@ -3,6 +3,10 @@ export interface SipInput {
   annualReturnPercent: number
   years: number
   stepUpPercent?: number
+  /** Existing mutual fund / SIP corpus to continue growing */
+  existingCorpus?: number
+  /** Amount already invested into that corpus (for gains tracking) */
+  existingInvested?: number
 }
 
 export interface SipYearPoint {
@@ -20,13 +24,27 @@ export interface SipResult {
 }
 
 export function calculateSip(input: SipInput): SipResult {
-  const { monthlyAmount, annualReturnPercent, years, stepUpPercent = 0 } = input
+  const {
+    monthlyAmount,
+    annualReturnPercent,
+    years,
+    stepUpPercent = 0,
+    existingCorpus = 0,
+    existingInvested = 0,
+  } = input
   const monthlyRate = annualReturnPercent / 12 / 100
 
-  let value = 0
-  let invested = 0
+  let value = existingCorpus
+  let invested = existingInvested
   let currentSip = monthlyAmount
-  const projection: SipYearPoint[] = [{ year: 0, invested: 0, value: 0, gains: 0 }]
+  const projection: SipYearPoint[] = [
+    {
+      year: 0,
+      invested,
+      value,
+      gains: value - invested,
+    },
+  ]
 
   for (let year = 1; year <= years; year++) {
     for (let m = 0; m < 12; m++) {

@@ -59,4 +59,54 @@ describe('calculatePrepaymentPlan', () => {
     expect(result.interestSaved).toBeGreaterThan(0)
     expect(result.monthsSaved).toBeGreaterThan(0)
   })
+
+  it('quarterly extras save interest vs no prepayment', () => {
+    const quarterly = calculatePrepaymentPlan({
+      principal: 50_00_000,
+      annualRate: 8.5,
+      tenureMonths: 240,
+      startDate: '2024-01-01',
+      extraAmount: 30_000,
+      frequency: 'quarterly',
+      mode: 'reduce_tenure',
+    })
+    expect(quarterly.interestSaved).toBeGreaterThan(0)
+    expect(quarterly.monthsSaved).toBeGreaterThan(0)
+  })
+
+  it('supports half-yearly frequency', () => {
+    const result = calculatePrepaymentPlan({
+      principal: 50_00_000,
+      annualRate: 8.5,
+      tenureMonths: 240,
+      startDate: '2024-01-01',
+      extraAmount: 50_000,
+      frequency: 'half_yearly',
+      mode: 'reduce_tenure',
+    })
+    expect(result.interestSaved).toBeGreaterThan(0)
+    expect(result.monthsSaved).toBeGreaterThan(0)
+  })
+})
+
+describe('expandPrepayments via generateAmortization', () => {
+  it('applies annual schedule prepayments', () => {
+    const without = generateAmortization({
+      principal: 10_00_000,
+      annualRate: 9,
+      tenureMonths: 120,
+      startDate: '2024-01-01',
+    })
+    const withAnnual = generateAmortization({
+      principal: 10_00_000,
+      annualRate: 9,
+      tenureMonths: 120,
+      startDate: '2024-01-01',
+      prepayments: [
+        { date: '2024-01-01', amount: 50_000, frequency: 'annually', endDate: '2028-01-01' },
+      ],
+    })
+    expect(withAnnual.schedule.length).toBeLessThan(without.schedule.length)
+    expect(withAnnual.totalInterest).toBeLessThan(without.totalInterest)
+  })
 })

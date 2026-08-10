@@ -42,4 +42,22 @@ describe('calculateSip', () => {
     })
     expect(stepped.futureValue).toBeGreaterThan(flat.futureValue)
   })
+
+  it('continues from existing corpus and invested amount', () => {
+    const fresh = calculateSip({
+      monthlyAmount: 10_000,
+      annualReturnPercent: 12,
+      years: 5,
+    })
+    const withExisting = calculateSip({
+      monthlyAmount: 10_000,
+      annualReturnPercent: 12,
+      years: 5,
+      existingCorpus: 5_00_000,
+      existingInvested: 4_00_000,
+    })
+    expect(withExisting.futureValue).toBeGreaterThan(fresh.futureValue)
+    expect(withExisting.totalInvested).toBe(fresh.totalInvested + 4_00_000)
+    expect(withExisting.projection[0].value).toBe(5_00_000)
+  })
 })

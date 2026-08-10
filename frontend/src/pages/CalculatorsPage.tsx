@@ -20,7 +20,7 @@ const calculators = [
   {
     to: '/calculators/sip',
     title: 'SIP calculator',
-    description: 'Project mutual fund SIP growth with optional annual step-up.',
+    description: 'Project SIP growth with step-up — optionally include your current running SIPs.',
     icon: Repeat,
     color: 'bg-sky-50 text-sky-700 dark:bg-sky-900/30 dark:text-sky-300',
   },
