@@ -4,6 +4,10 @@ dist
 dist-ssr
 *.local
 
+# Tauri / Rust
+frontend/src-tauri/target
+frontend/src-tauri/gen
+
 # Logs
 logs
 *.log
@@ -30,3 +34,9 @@ pnpm-debug.log*
 
 # Test
 coverage
+
+# Personal broker exports (PAN / client id)
+*.numbers
+taxpnl-*
+tradebook-*
+*YP1093*
