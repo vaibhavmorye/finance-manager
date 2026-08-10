@@ -33,6 +33,7 @@ export function SwpCalculatorPage() {
   const [withdrawal, setWithdrawal] = useState('40000')
   const [returnPct, setReturnPct] = useState('8')
   const [years, setYears] = useState('25')
+  const [stepUp, setStepUp] = useState('0')
   const [createOpen, setCreateOpen] = useState(false)
 
   const result = useMemo(
@@ -43,8 +44,9 @@ export function SwpCalculatorPage() {
         monthlyWithdrawal: Number(withdrawal) || 0,
         annualReturnPercent: Number(returnPct) || 0,
         years: Number(years) || 0,
+        annualStepUpPercent: Number(stepUp) || 0,
       }),
-    [mode, corpus, withdrawal, returnPct, years],
+    [mode, corpus, withdrawal, returnPct, years, stepUp],
   )
 
   const planCorpus =
@@ -136,6 +138,13 @@ export function SwpCalculatorPage() {
             type="number"
             value={years}
             onChange={(e) => setYears(e.target.value)}
+          />
+          <Input
+            label="Annual step-up %"
+            type="number"
+            value={stepUp}
+            onChange={(e) => setStepUp(e.target.value)}
+            hint="Increase withdrawal each year"
           />
         </Card>
 

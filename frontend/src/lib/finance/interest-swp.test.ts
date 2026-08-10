@@ -87,6 +87,18 @@ describe('requiredCorpusForSwp', () => {
     expect(withReturn).toBeLessThan(noReturn)
     expect(withReturn).toBeGreaterThan(0)
   })
+
+  it('needs a larger corpus when withdrawals step up annually', () => {
+    const flat = requiredCorpusForSwp(40_000, 8, 20, 0)
+    const stepped = requiredCorpusForSwp(40_000, 8, 20, 5)
+    expect(stepped).toBeGreaterThan(flat)
+  })
+
+  it('sums stepped withdrawals when return is 0', () => {
+    // 2 years, 10% step-up: 12*W + 12*W*1.1
+    const w = 10_000
+    expect(requiredCorpusForSwp(w, 0, 2, 10)).toBeCloseTo(12 * w + 12 * w * 1.1, 5)
+  })
 })
 
 describe('calculateSwp', () => {
@@ -130,5 +142,47 @@ describe('calculateSwp', () => {
     })
     expect(result.requiredCorpus).toBeGreaterThan(0)
     expect(result.sustainable).toBe(true)
+  })
+
+  it('honours annual withdrawal step-up in required_corpus mode', () => {
+    const flat = calculateSwp({
+      mode: 'required_corpus',
+      monthlyWithdrawal: 40_000,
+      annualReturnPercent: 8,
+      years: 20,
+      annualStepUpPercent: 0,
+    })
+    const stepped = calculateSwp({
+      mode: 'required_corpus',
+      monthlyWithdrawal: 40_000,
+      annualReturnPercent: 8,
+      years: 20,
+      annualStepUpPercent: 6,
+    })
+    expect(stepped.requiredCorpus).toBeGreaterThan(flat.requiredCorpus)
+    expect(stepped.totalWithdrawn).toBeGreaterThan(flat.totalWithdrawn)
+    expect(stepped.sustainable).toBe(true)
+  })
+
+  it('depletes sooner with step-up on the same corpus', () => {
+    const corpus = requiredCorpusForSwp(40_000, 8, 20, 0)
+    const flat = calculateSwp({
+      mode: 'sustainability',
+      corpus,
+      monthlyWithdrawal: 40_000,
+      annualReturnPercent: 8,
+      years: 20,
+      annualStepUpPercent: 0,
+    })
+    const stepped = calculateSwp({
+      mode: 'sustainability',
+      corpus,
+      monthlyWithdrawal: 40_000,
+      annualReturnPercent: 8,
+      years: 20,
+      annualStepUpPercent: 10,
+    })
+    expect(flat.sustainable).toBe(true)
+    expect(stepped.sustainable).toBe(false)
   })
 })
