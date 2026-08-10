@@ -1,10 +1,11 @@
 import type { FinanceData } from '@/types/finance'
-import { calculateEmi } from './loan'
+import { effectiveLoanEmi, effectiveLoanOutstanding } from './loan'
 
 export interface NetWorthBreakdown {
   stocks: number
   fixedDeposits: number
   mutualFunds: number
+  otherAssets: number
   propertyEquity: number
   totalAssets: number
   homeLoanBalance: number
@@ -25,30 +26,17 @@ export function mfValue(data: FinanceData): number {
   return data.mutualFunds.reduce((s, x) => s + x.currentValue, 0)
 }
 
+export function otherAssetsValue(data: FinanceData): number {
+  return (data.otherAssets ?? []).reduce((s, x) => s + x.quantity * x.currentPrice, 0)
+}
+
 export function propertyMarketValue(data: FinanceData): number {
   return data.homeLoans.reduce((s, x) => s + x.marketValue, 0)
 }
 
-/** Approximate outstanding principal using remaining tenure estimate */
+/** Outstanding principal as of today, including rate changes & prepayments. */
 export function homeLoanOutstanding(data: FinanceData): number {
-  return data.homeLoans.reduce((sum, loan) => {
-    // Simple estimate: use loan amount if no better calc; callers can refine
-    const monthsElapsed = monthsBetween(loan.startDate, new Date().toISOString().slice(0, 10))
-    const remaining = Math.max(0, loan.tenureMonths - monthsElapsed)
-    if (remaining <= 0) return sum
-    const emi = calculateEmi(loan.loanAmount, loan.interestRate, loan.tenureMonths)
-    // Approximate remaining balance via present value of remaining EMIs
-    const r = loan.interestRate / 12 / 100
-    if (r === 0) return sum + emi * remaining
-    const balance = (emi * (1 - Math.pow(1 + r, -remaining))) / r
-    return sum + balance
-  }, 0)
-}
-
-function monthsBetween(start: string, end: string): number {
-  const a = new Date(start)
-  const b = new Date(end)
-  return Math.max(0, (b.getFullYear() - a.getFullYear()) * 12 + (b.getMonth() - a.getMonth()))
+  return data.homeLoans.reduce((sum, loan) => sum + effectiveLoanOutstanding(loan), 0)
 }
 
 export function otherDebtBalance(data: FinanceData): number {
@@ -59,17 +47,19 @@ export function calculateNetWorth(data: FinanceData): NetWorthBreakdown {
   const stocks = stocksValue(data)
   const fixedDeposits = fdValue(data)
   const mutualFunds = mfValue(data)
+  const otherAssets = otherAssetsValue(data)
   const property = propertyMarketValue(data)
   const homeLoanBalance = homeLoanOutstanding(data)
   const otherDebt = otherDebtBalance(data)
   const propertyEquity = property - homeLoanBalance
-  const totalAssets = stocks + fixedDeposits + mutualFunds + property
+  const totalAssets = stocks + fixedDeposits + mutualFunds + otherAssets + property
   const totalLiabilities = homeLoanBalance + otherDebt
 
   return {
     stocks,
     fixedDeposits,
     mutualFunds,
+    otherAssets,
     propertyEquity,
     totalAssets,
     homeLoanBalance,
@@ -93,10 +83,7 @@ export function monthlyExpensesTotal(data: FinanceData): number {
 }
 
 export function monthlyEmiTotal(data: FinanceData): number {
-  const home = data.homeLoans.reduce(
-    (s, l) => s + calculateEmi(l.loanAmount, l.interestRate, l.tenureMonths),
-    0,
-  )
+  const home = data.homeLoans.reduce((s, l) => s + effectiveLoanEmi(l), 0)
   const other = data.otherDebts.reduce((s, d) => s + d.emi, 0)
   return home + other
 }
@@ -131,5 +118,5 @@ export function monthlyCashFlow(data: FinanceData) {
 }
 
 export function totalInvestedCorpus(data: FinanceData): number {
-  return stocksValue(data) + fdValue(data) + mfValue(data)
+  return stocksValue(data) + fdValue(data) + mfValue(data) + otherAssetsValue(data)
 }

@@ -10,6 +10,29 @@ function toDateString(d: Date | null | undefined): string {
   return d.toISOString().slice(0, 10)
 }
 
+function currentFyStartYear(): number {
+  const now = new Date()
+  const y = now.getFullYear()
+  const m = now.getMonth() + 1
+  return m >= 4 ? y : y - 1
+}
+
+function normalizeTaxProfile(raw: unknown) {
+  const t = (raw && typeof raw === 'object' ? raw : {}) as Record<string, unknown>
+  const num = (v: unknown) => (typeof v === 'number' && Number.isFinite(v) ? v : 0)
+  return {
+    fyStartYear: typeof t.fyStartYear === 'number' ? t.fyStartYear : currentFyStartYear(),
+    section80C: num(t.section80C),
+    section80D: num(t.section80D),
+    section80CCD1B: num(t.section80CCD1B),
+    basicSalaryAnnual: num(t.basicSalaryAnnual),
+    hraReceivedAnnual: num(t.hraReceivedAnnual),
+    rentPaidAnnual: num(t.rentPaidAnnual),
+    isMetro: typeof t.isMetro === 'boolean' ? t.isMetro : true,
+    section24b: num(t.section24b),
+  }
+}
+
 /** Returns the full finance snapshot for the authenticated user (frontend FinanceData shape). */
 router.get('/snapshot', async (req: AuthRequest, res, next) => {
   try {
@@ -23,10 +46,13 @@ router.get('/snapshot', async (req: AuthRequest, res, next) => {
         stocks: true,
         fixedDeposits: true,
         mutualFunds: true,
+        mfTransactions: true,
+        otherAssets: true,
         homeLoans: { include: { rateChanges: true, prepayments: true } },
         otherDebts: true,
         healthInsurance: true,
         expenses: true,
+        expenseEntries: true,
         settings: true,
       },
     })
@@ -41,7 +67,10 @@ router.get('/snapshot', async (req: AuthRequest, res, next) => {
         retirementAge: user.profile?.retirementAge ?? 60,
         onboardingComplete: user.profile?.onboardingComplete ?? false,
       },
-      salary: { monthlyInHand: user.salary?.monthlyInHand ?? 0 },
+      salary: {
+        monthlyGross: user.salary?.monthlyGross ?? 0,
+        monthlyInHand: user.salary?.monthlyInHand ?? 0,
+      },
       otherIncomes: user.otherIncomes,
       stocks: user.stocks.map((s) => ({
         id: s.id,
@@ -59,7 +88,34 @@ router.get('/snapshot', async (req: AuthRequest, res, next) => {
         startDate: toDateString(f.startDate),
         maturityDate: toDateString(f.maturityDate),
       })),
-      mutualFunds: user.mutualFunds,
+      mutualFunds: user.mutualFunds.map((m) => ({
+        id: m.id,
+        name: m.name,
+        investedAmount: m.investedAmount,
+        currentValue: m.currentValue,
+        monthlySip: m.monthlySip,
+        fundCategory: (m.fundCategory === 'debt' ? 'debt' : 'equity') as 'equity' | 'debt',
+      })),
+      mfTransactions: (user.mfTransactions ?? []).map((t) => ({
+        id: t.id,
+        fundId: t.fundId,
+        tradeId: t.tradeId ?? undefined,
+        date: toDateString(t.date),
+        type: t.type as 'buy' | 'sell' | 'sip',
+        units: t.units,
+        nav: t.nav,
+        amount: t.amount ?? undefined,
+        sourceFile: t.sourceFile ?? undefined,
+      })),
+      otherAssets: (user.otherAssets ?? []).map((a) => ({
+        id: a.id,
+        name: a.name,
+        kind: a.kind as 'gold' | 'silver' | 'other',
+        quantity: a.quantity,
+        unit: a.unit,
+        buyPrice: a.buyPrice,
+        currentPrice: a.currentPrice,
+      })),
       homeLoans: user.homeLoans.map((l) => ({
         id: l.id,
         name: l.name,
@@ -70,6 +126,8 @@ router.get('/snapshot', async (req: AuthRequest, res, next) => {
         startDate: toDateString(l.startDate),
         interestRate: l.interestRate,
         tenureMonths: l.tenureMonths,
+        emi: l.emi ?? undefined,
+        amountPaid: l.amountPaid ?? undefined,
         rateChanges: l.rateChanges.map((r) => ({
           id: r.id,
           date: toDateString(r.date),
@@ -79,19 +137,32 @@ router.get('/snapshot', async (req: AuthRequest, res, next) => {
           id: p.id,
           date: toDateString(p.date),
           amount: p.amount,
+          frequency: p.frequency ?? undefined,
+          endDate: p.endDate ? toDateString(p.endDate) : undefined,
         })),
       })),
       otherDebts: user.otherDebts,
       healthInsurance: user.healthInsurance.map((h) => ({
         id: h.id,
         provider: h.provider,
+        type: h.type ?? 'health',
         coverAmount: h.coverAmount,
         premium: h.premium,
         frequency: h.frequency,
         renewalDate: toDateString(h.renewalDate),
+        peopleCovered: Array.isArray(h.peopleCovered) ? h.peopleCovered : [],
       })),
       expenses: user.expenses,
+      expenseEntries: user.expenseEntries.map((e) => ({
+        id: e.id,
+        category: e.category,
+        name: e.name,
+        amount: e.amount,
+        date: toDateString(e.date),
+        notes: e.notes ?? undefined,
+      })),
       settings: { theme: (user.settings?.theme ?? 'system') as 'light' | 'dark' | 'system' },
+      taxProfile: normalizeTaxProfile(user.settings?.taxProfile),
     })
   } catch (err) {
     next(err)
@@ -126,14 +197,28 @@ router.put('/snapshot', async (req: AuthRequest, res, next) => {
 
       await tx.salary.upsert({
         where: { userId },
-        create: { userId, monthlyInHand: data.salary?.monthlyInHand ?? 0 },
-        update: { monthlyInHand: data.salary?.monthlyInHand ?? 0 },
+        create: {
+          userId,
+          monthlyGross: data.salary?.monthlyGross ?? 0,
+          monthlyInHand: data.salary?.monthlyInHand ?? 0,
+        },
+        update: {
+          monthlyGross: data.salary?.monthlyGross ?? 0,
+          monthlyInHand: data.salary?.monthlyInHand ?? 0,
+        },
       })
 
       await tx.userSettings.upsert({
         where: { userId },
-        create: { userId, theme: data.settings?.theme ?? 'system' },
-        update: { theme: data.settings?.theme ?? 'system' },
+        create: {
+          userId,
+          theme: data.settings?.theme ?? 'system',
+          taxProfile: data.taxProfile ?? normalizeTaxProfile(null),
+        },
+        update: {
+          theme: data.settings?.theme ?? 'system',
+          taxProfile: data.taxProfile ?? normalizeTaxProfile(null),
+        },
       })
 
       await tx.otherIncome.deleteMany({ where: { userId } })
@@ -197,6 +282,7 @@ router.put('/snapshot', async (req: AuthRequest, res, next) => {
         })
       }
 
+      await tx.mfTransaction.deleteMany({ where: { userId } })
       await tx.mutualFund.deleteMany({ where: { userId } })
       if (data.mutualFunds?.length) {
         await tx.mutualFund.createMany({
@@ -207,6 +293,7 @@ router.put('/snapshot', async (req: AuthRequest, res, next) => {
               investedAmount: number
               currentValue: number
               monthlySip: number
+              fundCategory?: string
             }) => ({
               id: m.id,
               userId,
@@ -214,6 +301,61 @@ router.put('/snapshot', async (req: AuthRequest, res, next) => {
               investedAmount: m.investedAmount,
               currentValue: m.currentValue,
               monthlySip: m.monthlySip,
+              fundCategory: m.fundCategory === 'debt' ? 'debt' : 'equity',
+            }),
+          ),
+        })
+      }
+      if (data.mfTransactions?.length) {
+        await tx.mfTransaction.createMany({
+          data: data.mfTransactions.map(
+            (t: {
+              id?: string
+              fundId: string
+              tradeId?: string
+              date: string
+              type: string
+              units: number
+              nav: number
+              amount?: number
+              sourceFile?: string
+            }) => ({
+              id: t.id,
+              userId,
+              fundId: t.fundId,
+              tradeId: t.tradeId ?? null,
+              date: new Date(t.date),
+              type: t.type,
+              units: t.units,
+              nav: t.nav,
+              amount: t.amount ?? null,
+              sourceFile: t.sourceFile ?? null,
+            }),
+          ),
+        })
+      }
+
+      await tx.otherAsset.deleteMany({ where: { userId } })
+      if (data.otherAssets?.length) {
+        await tx.otherAsset.createMany({
+          data: data.otherAssets.map(
+            (a: {
+              id?: string
+              name: string
+              kind?: string
+              quantity: number
+              unit?: string
+              buyPrice: number
+              currentPrice: number
+            }) => ({
+              id: a.id,
+              userId,
+              name: a.name,
+              kind: a.kind ?? 'other',
+              quantity: a.quantity,
+              unit: a.unit ?? 'g',
+              buyPrice: a.buyPrice,
+              currentPrice: a.currentPrice,
             }),
           ),
         })
@@ -233,6 +375,8 @@ router.put('/snapshot', async (req: AuthRequest, res, next) => {
             startDate: new Date(l.startDate),
             interestRate: l.interestRate,
             tenureMonths: l.tenureMonths,
+            emi: l.emi ?? null,
+            amountPaid: l.amountPaid ?? null,
             rateChanges: {
               create: (l.rateChanges ?? []).map((r: { id?: string; date: string; interestRate: number }) => ({
                 id: r.id,
@@ -241,11 +385,23 @@ router.put('/snapshot', async (req: AuthRequest, res, next) => {
               })),
             },
             prepayments: {
-              create: (l.prepayments ?? []).map((p: { id?: string; date: string; amount: number }) => ({
-                id: p.id,
-                date: new Date(p.date),
-                amount: p.amount,
-              })),
+              create: (
+                l.prepayments ?? []
+              ).map(
+                (p: {
+                  id?: string
+                  date: string
+                  amount: number
+                  frequency?: string
+                  endDate?: string
+                }) => ({
+                  id: p.id,
+                  date: new Date(p.date),
+                  amount: p.amount,
+                  frequency: p.frequency ?? null,
+                  endDate: p.endDate ? new Date(p.endDate) : null,
+                }),
+              ),
             },
           },
         })
@@ -282,18 +438,22 @@ router.put('/snapshot', async (req: AuthRequest, res, next) => {
             (h: {
               id?: string
               provider: string
+              type?: string
               coverAmount: number
               premium: number
               frequency: string
               renewalDate: string
+              peopleCovered?: string[]
             }) => ({
               id: h.id,
               userId,
               provider: h.provider,
+              type: h.type ?? 'health',
               coverAmount: h.coverAmount,
               premium: h.premium,
               frequency: h.frequency,
               renewalDate: new Date(h.renewalDate),
+              peopleCovered: h.peopleCovered ?? [],
             }),
           ),
         })
@@ -309,6 +469,30 @@ router.put('/snapshot', async (req: AuthRequest, res, next) => {
               category: e.category,
               name: e.name,
               amount: e.amount,
+            }),
+          ),
+        })
+      }
+
+      await tx.expenseEntry.deleteMany({ where: { userId } })
+      if (data.expenseEntries?.length) {
+        await tx.expenseEntry.createMany({
+          data: data.expenseEntries.map(
+            (e: {
+              id?: string
+              category: string
+              name: string
+              amount: number
+              date: string
+              notes?: string
+            }) => ({
+              id: e.id,
+              userId,
+              category: e.category,
+              name: e.name,
+              amount: e.amount,
+              date: new Date(e.date),
+              notes: e.notes ?? null,
             }),
           ),
         })

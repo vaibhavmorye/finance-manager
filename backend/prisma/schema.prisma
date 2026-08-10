@@ -20,10 +20,13 @@ model User {
   stocks          Stock[]
   fixedDeposits   FixedDeposit[]
   mutualFunds     MutualFund[]
+  mfTransactions  MfTransaction[]
+  otherAssets     OtherAsset[]
   homeLoans       HomeLoan[]
   otherDebts      OtherDebt[]
   healthInsurance HealthInsurance[]
   expenses        MonthlyExpense[]
+  expenseEntries  ExpenseEntry[]
   settings        UserSettings?
 }
 
@@ -41,6 +44,7 @@ model Profile {
 model Salary {
   id              String @id @default(uuid())
   userId          String @unique
+  monthlyGross    Float  @default(0)
   monthlyInHand   Float  @default(0)
   user            User   @relation(fields: [userId], references: [id], onDelete: Cascade)
 }
@@ -89,7 +93,39 @@ model MutualFund {
   investedAmount Float
   currentValue   Float
   monthlySip     Float  @default(0)
+  fundCategory   String @default("equity")
   user           User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+}
+
+model MfTransaction {
+  id         String   @id @default(uuid())
+  userId     String
+  fundId     String
+  tradeId    String?
+  date       DateTime @db.Date
+  type       String
+  units      Float
+  nav        Float
+  amount     Float?
+  sourceFile String?
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([userId, fundId])
+}
+
+model OtherAsset {
+  id           String @id @default(uuid())
+  userId       String
+  name         String
+  kind         String @default("other")
+  quantity     Float
+  unit         String @default("g")
+  buyPrice     Float
+  currentPrice Float
+  user         User   @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([userId])
 }
@@ -105,6 +141,8 @@ model HomeLoan {
   startDate     DateTime     @db.Date
   interestRate  Float
   tenureMonths  Int
+  emi           Float?
+  amountPaid    Float?
   rateChanges   RateChange[]
   prepayments   Prepayment[]
   user          User         @relation(fields: [userId], references: [id], onDelete: Cascade)
@@ -123,11 +161,13 @@ model RateChange {
 }
 
 model Prepayment {
-  id         String   @id @default(uuid())
+  id         String    @id @default(uuid())
   homeLoanId String
-  date       DateTime @db.Date
+  date       DateTime  @db.Date
   amount     Float
-  homeLoan   HomeLoan @relation(fields: [homeLoanId], references: [id], onDelete: Cascade)
+  frequency  String?
+  endDate    DateTime? @db.Date
+  homeLoan   HomeLoan  @relation(fields: [homeLoanId], references: [id], onDelete: Cascade)
 
   @@index([homeLoanId])
 }
@@ -146,14 +186,16 @@ model OtherDebt {
 }
 
 model HealthInsurance {
-  id          String   @id @default(uuid())
-  userId      String
-  provider    String
-  coverAmount Float
-  premium     Float
-  frequency   String   @default("yearly")
-  renewalDate DateTime @db.Date
-  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  id            String   @id @default(uuid())
+  userId        String
+  provider      String
+  type          String   @default("health")
+  coverAmount   Float
+  premium       Float
+  frequency     String   @default("yearly")
+  renewalDate   DateTime @db.Date
+  peopleCovered Json     @default("[]")
+  user          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([userId])
 }
@@ -169,9 +211,24 @@ model MonthlyExpense {
   @@index([userId])
 }
 
+model ExpenseEntry {
+  id       String   @id @default(uuid())
+  userId   String
+  category String
+  name     String
+  amount   Float
+  date     DateTime @db.Date
+  notes    String?
+  user     User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([userId, date])
+}
+
 model UserSettings {
-  id     String @id @default(uuid())
-  userId String @unique
-  theme  String @default("system")
-  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  id         String @id @default(uuid())
+  userId     String @unique
+  theme      String @default("system")
+  taxProfile Json?
+  user       User   @relation(fields: [userId], references: [id], onDelete: Cascade)
 }
